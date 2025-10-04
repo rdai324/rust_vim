@@ -48,7 +48,7 @@ The View component is responsible for displaying the right content on the screen
 
 The Controller module is primarily responsible for handling the user inputs, parsing commands, keeping track of the current mode, and coordinating with the Model component and View component.  
 
-James will be responsible for the model component as he has prior work experience and expertise with buffer management. Ray will focus on the front-end tasks such as the UI and the input controller, due to his interests and experiences with front-end development from prior coursework. The following table shows a more detailed breakdown of tasks and their assignment.
+James will be responsible for the model component as he has prior work experience and expertise with buffer management. Ray will focus on the front-end tasks such as the UI and the input controller, due to his interests and experiences with front-end development from prior coursework. The following table shows a more detailed breakdown of tasks and their assignment. Component-API level unit testing will be taken care of by its respective owners. The final system integration will be a joint effort between James and Ray.
 
 | Task                                                | Team Member Responsible                                       |
 | --------------------------------------------------- | ------------------------------------------------------------- |
