@@ -4,8 +4,8 @@ use std::io;
 pub use view::View;
 
 fn main() -> io::Result<()> {
-    let dummy_file_name = String::from("Bee_Movie.txt");
-    let dummy_string = String::from(
+    let mut dummy_file_name = String::from("Bee_Movie.txt");
+    let mut dummy_string = String::from(
         "According to all known laws of aviation, there is no way a bee should be able to fly.
         Its wings are too small to get its fat little body off the ground.
         The bee, of course, flies anyway because bees don't care what humans think is impossible.
@@ -30,7 +30,7 @@ fn main() -> io::Result<()> {
 
     let mut terminal = ratatui::init();
 
-    let app_result = View::new().run(&mut terminal);
+    let app_result = View::new(&mut dummy_file_name, &mut dummy_string).run(&mut terminal);
 
     ratatui::restore();
     app_result
