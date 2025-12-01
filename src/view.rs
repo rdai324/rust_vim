@@ -1,131 +1,68 @@
-use crossterm::{
-    ExecutableCommand,
-    cursor::{EnableBlinking, MoveTo, Show},
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
-    execute,
-};
-use ratatui::{
-    DefaultTerminal, Frame,
-    buffer::Buffer,
-    layout::{Position, Rect},
-    style::Stylize,
-    symbols::border,
-    text::{Line, Text},
-    widgets::{Block, Paragraph, Widget, Wrap},
-};
-use std::cmp;
-use std::io;
+use crate::App;
+use count_digits::{self, CountDigits};
+use ratatui::Frame;
+use ratatui::layout::{Constraint, Direction, Layout, Position};
+use ratatui::style::{Color, Modifier, Style, Stylize};
+use ratatui::symbols::border;
+use ratatui::text::{Line, Text};
+use ratatui::widgets::{Block, Borders, Paragraph};
+use std::cmp::max;
 
-#[derive(Debug)]
-pub enum Mode {
-    Normal,
-    Command,
-    Search,
-    Insert,
-}
+pub fn draw_ui(frame: &mut Frame, app: &mut App) {
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(vec![Constraint::Min(1), Constraint::Length(2)])
+        .split(frame.area());
 
-#[derive(Debug)]
-pub struct View<'a> {
-    filename: &'a str,        // Name of the file opened
-    display_content: &'a str, // str slice representing the section of text currently being displayed in the View UI
-    mode: Mode,
-    caret_pos_x: u16,
-    caret_pos_y: u16,
-    running: bool,
-}
+    // Used for line numbers and file contents
+    let main_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(vec![Constraint::Length(0), Constraint::Min(1)])
+        .split(layout[0]);
 
-impl<'a> View<'a> {
-    pub fn new(filename: &'a mut str, display_content: &'a mut str) -> Self {
-        Self {
-            filename: filename,
-            display_content: display_content,
-            mode: Mode::Normal,
-            caret_pos_x: 1,
-            caret_pos_y: 1,
-            running: true,
-        }
-    }
+    // Used for cursor coordinates, command line, and error messages
+    let bottom_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(vec![
+            // usize to u16 conversion should be safe, since the number of digits in the cursor should be small
+            Constraint::Length(
+                5 + max(
+                    app.get_filelline().count_digits(),
+                    app.get_cursor_pos().1.count_digits(),
+                ) as u16,
+            ),
+            Constraint::Min(12),
+        ])
+        .split(layout[1]);
 
-    /*
-     * "main loop" which renders UI and listens for user input
-     */
-    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
-        while self.running {
-            terminal.draw(|frame| self.draw(frame))?;
-            self.handle_events()?;
-        }
-        return Ok(());
-    }
+    // File Content
+    let title = Line::from(app.get_filename().bold());
+    let content_block = Block::bordered().title(title).border_set(border::THICK);
+    let content = Paragraph::new(app.get_content()).block(content_block);
+    frame.render_widget(content, main_layout[1]);
 
-    fn exit(&mut self) {
-        self.running = false;
-    }
+    // Cursor Location
+    let cursor_pos = app.get_cursor_pos();
+    let cursor_row_text = format!("row: {}", cursor_pos.0);
+    let cursor_col_text = format!("col: {}", cursor_pos.1);
+    let cursor_pos_content: Text = vec![cursor_row_text.into(), cursor_col_text.into()].into();
+    frame.render_widget(Paragraph::new(cursor_pos_content), bottom_layout[0]);
 
-    fn draw(&self, frame: &mut Frame) {
-        // Renders the View's UI by using its implementation of Widget::render() defined below
-        frame.render_widget(self, frame.area());
-        frame.set_cursor_position(Position::new(self.caret_pos_x, self.caret_pos_y));
-    }
+    // Command Window
+    let app_mode = app.get_mode();
+    let mode_text = Line::styled(
+        app_mode,
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )
+    .centered();
+    let ui_message = app.get_ui_display();
+    let ui_text = Line::styled(ui_message, Style::default().fg(Color::White)).centered();
+    let ui_content: Text = vec![mode_text.into(), ui_text.into()].into();
+    let ui_block = Block::new().borders(Borders::LEFT);
+    frame.render_widget(Paragraph::new(ui_content).block(ui_block), bottom_layout[1]);
 
-    /*
-     * Accepts any user inputs provided via crossterm while the program is running,
-     * and passes them to the Controller for further processing
-     */
-    fn handle_events(&mut self) -> io::Result<()> {
-        // TO DO: event::read is a blocking call, consider using event::poll instead?
-        match event::read()? {
-            // Checks that this was a key press event.
-            Event::Key(key_event) => {
-                if key_event.kind == KeyEventKind::Press {
-                    self.handle_key_event(key_event)
-                }
-            }
-            _ => {}
-        };
-        return Ok(());
-    }
-
-    /*
-     * Handles key press events specifically
-     */
-    fn handle_key_event(&mut self, key_event: KeyEvent) {
-        match key_event.code {
-            KeyCode::Char('q') => self.exit(), // Temp exit command until the controller is implemented
-            KeyCode::Up => self.caret_pos_y = cmp::max(self.caret_pos_y - 1, 1), // TO DO: Auto-snap cursor to end of line if needed.
-            KeyCode::Down => self.caret_pos_y = self.caret_pos_y + 1, // TO DO: Auto-snap cursor to end of line if needed. Scroll when at the bottom
-            KeyCode::Left => self.caret_pos_x = cmp::max(self.caret_pos_x - 1, 1),
-            KeyCode::Right => self.caret_pos_x = self.caret_pos_x + 1, // TO DO: Limit how far right the caret can travel
-            _ => { /* TO DO: Send to controller to process. */ }
-        };
-    }
-}
-
-impl<'a> Widget for &View<'a> {
-    /*
-     * Render's the View's UI
-     *
-     * TO DO:
-     * - Render caret/cursor
-     * - Add scroll bar
-     * - Add status/message bar at bottom for errors, command and search UI and details such as line #
-     * -
-     */
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let title = Line::from(self.filename.bold());
-        let block = Block::bordered()
-            .title(title.centered())
-            .border_set(border::THICK);
-
-        Paragraph::new(self.display_content)
-            .block(block)
-            .wrap(Wrap { trim: false })
-            .render(area, buf);
-
-        /*
-        io::stdout()
-            .execute(MoveTo(self.caret_pos_x as u16, self.caret_pos_y as u16))?
-            .execute(Show)?
-            .execute(EnableBlinking);
-        */
-    }
+    // Render cursor
+    frame.set_cursor_position(Position::new(cursor_pos.1, cursor_pos.0));
 }

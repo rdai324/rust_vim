@@ -1,7 +1,20 @@
+mod controller;
 mod view;
-use ratatui;
+use controller::App;
+use ratatui::{Terminal, prelude::Backend};
 use std::io;
-pub use view::View;
+use view::draw_ui;
+
+/*
+ * "main loop" which renders UI and listens for user input
+ */
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<()> {
+    while app.running() {
+        terminal.draw(|frame| draw_ui(frame, app))?; // draw_ui will be a pub func from view to draw the ui
+        app.handle_events()?; // controller will process inputs
+    }
+    return Ok(());
+}
 
 fn main() -> io::Result<()> {
     let mut dummy_file_name = String::from("Bee_Movie.txt");
@@ -30,7 +43,9 @@ fn main() -> io::Result<()> {
 
     let mut terminal = ratatui::init();
 
-    let app_result = View::new(&mut dummy_file_name, &mut dummy_string).run(&mut terminal);
+    let mut app = App::new(&mut dummy_file_name, &mut dummy_string);
+
+    let app_result = run_app(&mut terminal, &mut app);
 
     ratatui::restore();
     app_result

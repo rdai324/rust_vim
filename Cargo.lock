@@ -139,6 +139,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "count-digits"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9c7f4086dd64c9d7e5e5957af4599fd1329314df9f3856acf677b96502e9aa7"
+
+[[package]]
 name = "crossterm"
 version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -927,6 +933,7 @@ dependencies = [
 name = "rust_vim"
 version = "0.1.0"
 dependencies = [
+ "count-digits",
  "crossterm 0.29.0",
  "io",
  "ratatui",
