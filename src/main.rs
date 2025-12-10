@@ -10,6 +10,8 @@ use view::draw_ui;
  */
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<()> {
     while app.running() {
+        let term_size = terminal.size()?;
+        app.update_term_size(term_size.height, term_size.width);
         terminal.draw(|frame| draw_ui(frame, app))?; // draw_ui will be a pub func from view to draw the ui
         app.handle_events()?; // controller will process inputs
     }
@@ -42,8 +44,15 @@ fn main() -> io::Result<()> {
     );
 
     let mut terminal = ratatui::init();
+    let term_height = terminal.size()?.height;
+    let term_width = terminal.size()?.width;
 
-    let mut app = App::new(&mut dummy_file_name, &mut dummy_string);
+    let mut app = App::new(
+        &mut dummy_file_name,
+        &mut dummy_string,
+        term_height,
+        term_width,
+    );
 
     let app_result = run_app(&mut terminal, &mut app);
 
