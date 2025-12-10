@@ -32,19 +32,47 @@ fn string_to_lines(
             continue;
         }
 
+        // Handle tab spaces seperately due to dynamic sizing
+        if character == '\t' {
+            // Assume 4-space tabs
+            let tab_len = 4 - (curr_len % 4);
+
+            // Render tab spaces as tab_len number of spaces
+            if curr_len + tab_len <= max_line_len as u64 {
+                for _ in 0..tab_len {
+                    line.push(' ');
+                }
+                curr_len = curr_len + tab_len;
+            } else {
+                lines.push(line.iter().collect());
+                line_numbers.push(line_num);
+                line = vec![' ', ' ', ' ', ' '];
+                curr_len = 4;
+            }
+            continue;
+        }
+
         // Check curr_len of line + unicode length of character vs length
-        let width = width(&character.to_string());
-        if curr_len + width <= max_line_len as u64 {
+        let char_width = width(&character.to_string());
+        if curr_len + char_width <= max_line_len as u64 {
             // if it fits, append character to line and add its unicode length to curr len
             line.push(character);
-            curr_len = curr_len + width;
+            curr_len = curr_len + char_width;
         } else {
-            // else, stop building line and append it and its line number to vectors. Start building a new line
+            // else, stop building line and append it and its line number to vectors.
             lines.push(line.iter().collect());
             line_numbers.push(line_num);
-            line = Vec::new();
-            curr_len = 0;
+
+            // Start building a new line with this character
+            line = vec![character];
+            curr_len = char_width;
         }
+    }
+
+    // Push the last line to lines
+    if curr_len > 0 {
+        lines.push(line.iter().collect());
+        line_numbers.push(line_num);
     }
     return (lines, line_numbers);
 }
@@ -111,7 +139,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     )
     .centered();
     let ui_text = Line::styled(ui_message, Style::default().fg(Color::White)).centered();
-    let ui_content: Text = vec![mode_text.into(), ui_text.into()].into();
+    let ui_content: Text = vec![mode_text, ui_text].into();
     let ui_block = Block::new().borders(Borders::LEFT);
     frame.render_widget(Paragraph::new(ui_content).block(ui_block), bottom_layout[1]);
 
