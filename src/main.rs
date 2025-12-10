@@ -21,8 +21,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
 fn main() -> io::Result<()> {
     let mut dummy_file_name = String::from("Bee_Movie.txt");
     let mut dummy_string = String::from(
-        "According to all known laws of aviation, there is no way a bee should be able to fly.
-        Its wings are too small to get its fat little body off the ground.
+        "According to all known laws of aviation, there is no way a bee should be able to fly.\n\tIts wings are too small to get its fat little body off the ground.
         The bee, of course, flies anyway because bees don't care what humans think is impossible.
         Yellow, black. Yellow, black. Yellow, black. Yellow, black.
         Ooh, black and yellow!

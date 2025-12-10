@@ -1,7 +1,7 @@
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
-use ratatui::layout::Size;
 use std::cmp;
 use std::io;
+use unicode_display_width::width;
 
 #[derive(Debug)]
 pub enum Mode {
@@ -12,15 +12,30 @@ pub enum Mode {
     Insert,
 }
 
+/*
+fn nth_line_len(string: &str, max_line_len: u16, n: u16) -> u16 {
+    let lines = string.lines();
+    let mut curr_line = 1;
+    for line in lines {
+        // we are currently at the nth line
+
+        if width(line) <= max_line_len as u64 {
+
+        }
+        // split the line into max_line_len chunks
+    }
+}
+*/
 #[derive(Debug)]
 pub struct App<'a> {
     filename: &'a str,        // Name of the file opened
     display_content: &'a str, // str slice representing the section of text currently being displayed in the View UI
-    file_line: usize,         // Which line of the file appears at the top of the terminal window
+    display_file_line: usize, // Which line of the file corresponds to the first line of text loaded into display_content
+    scroll_amount: usize,     // How far did we scroll down display_content?
     mode: Mode,
     ui_display: String,     // Input taken from user for commands or searching
     cursor_pos: (u16, u16), // cursor position in terminal. (y, x), or (row, col), with 1,1 being the top-left corner (1 not 0 due to border)
-    term_size: (u16, u16),
+    term_size: (u16, u16),  // Terminal size
     running: bool,
 }
 
@@ -34,7 +49,8 @@ impl<'a> App<'a> {
         Self {
             filename,
             display_content,
-            file_line: 1,
+            display_file_line: 1,
+            scroll_amount: 0,
             mode: Mode::Normal,
             ui_display: String::from(""),
             cursor_pos: (1, 1),
@@ -49,8 +65,11 @@ impl<'a> App<'a> {
     pub fn get_content(&self) -> &str {
         return self.display_content;
     }
-    pub fn get_fileline(&self) -> usize {
-        return self.file_line;
+    pub fn get_display_fileline(&self) -> usize {
+        return self.display_file_line;
+    }
+    pub fn get_scroll_amount(&self) -> usize {
+        return self.scroll_amount;
     }
     pub fn get_mode(&self) -> &str {
         match &self.mode {
@@ -66,6 +85,9 @@ impl<'a> App<'a> {
     }
     pub fn get_cursor_pos(&self) -> (u16, u16) {
         return self.cursor_pos;
+    }
+    pub fn get_term_size(&self) -> (u16, u16) {
+        return self.term_size;
     }
     pub fn running(&self) -> bool {
         return self.running;

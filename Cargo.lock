@@ -937,6 +937,7 @@ dependencies = [
  "crossterm 0.29.0",
  "io",
  "ratatui",
+ "unicode-display-width",
 ]
 
 [[package]]
@@ -1207,6 +1208,15 @@ dependencies = [
  "crunchy",
  "hex",
  "static_assertions",
+]
+
+[[package]]
+name = "unicode-display-width"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a43273b656140aa2bb8e65351fe87c255f0eca706b2538a9bd4a590a3490bf3"
+dependencies = [
+ "unicode-segmentation",
 ]
 
 [[package]]
