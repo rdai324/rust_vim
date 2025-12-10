@@ -99,6 +99,12 @@ impl<'a> App<'a> {
 
     pub fn update_term_size(&mut self, term_height: u16, term_width: u16) {
         self.term_size = (term_height, term_width);
+        if self.cursor_pos.0 > self.term_size.0 - 4 {
+            self.cursor_pos.0 = self.term_size.0 - 4;
+        }
+        if self.cursor_pos.1 > self.term_size.1 - 2 {
+            self.cursor_pos.1 = self.term_size.1 - 2;
+        }
     }
 
     /*
