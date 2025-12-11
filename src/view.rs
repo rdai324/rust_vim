@@ -11,8 +11,6 @@ use std::cmp::max;
 use std::io::stdout;
 
 pub fn draw_ui(frame: &mut Frame, app: &mut App) {
-    let file_line = app.get_first_line_num();
-    let first_char_ind = app.get_first_char_ind();
     let scroll_amount = app.get_scroll_amount();
     let cursor_pos = app.get_cursor_pos();
 
@@ -21,6 +19,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     let app_mode = app.get_mode();
     let ui_message = app.get_ui_display();
     let curr_row = display_lines[(scroll_amount + cursor_pos.0) as usize - 1].line_num;
+    let curr_col = display_lines[(scroll_amount + cursor_pos.0) as usize - 1].inline_index;
 
     let layout = Layout::default()
         .direction(Direction::Vertical)
@@ -32,9 +31,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
         .direction(Direction::Horizontal)
         .constraints(vec![
             // usize to u16 conversion and vice versa should be safe, since the number of digits in the cursor should be small
-            Constraint::Length(
-                5 + max(curr_row.count_digits(), cursor_pos.1.count_digits()) as u16,
-            ),
+            Constraint::Length(5 + max(curr_row.count_digits(), curr_col.count_digits()) as u16),
             Constraint::Min(12),
         ])
         .split(layout[1]);
@@ -55,7 +52,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
 
     // Cursor Location
     let cursor_row_text = format!("row: {}", curr_row);
-    let cursor_col_text = format!("col: {}", cursor_pos.1);
+    let cursor_col_text = format!("col: {}", curr_col);
     let cursor_pos_content: Text = vec![cursor_row_text.into(), cursor_col_text.into()].into();
     frame.render_widget(Paragraph::new(cursor_pos_content), bottom_layout[0]);
 

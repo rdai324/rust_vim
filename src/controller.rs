@@ -13,12 +13,20 @@ pub enum Mode {
     Insert,
 }
 
-fn string_to_lines(string: &str, max_line_len: u16, first_line_num: usize) -> Vec<DisplayLine> {
+fn string_to_lines(
+    string: &str,
+    max_line_len: u16,
+    first_line_num: usize,
+    first_char_ind: usize,
+) -> Vec<DisplayLine> {
     let chars = string.chars();
     let mut lines: Vec<DisplayLine> = Vec::new();
     let mut line: Vec<char> = Vec::new();
     let mut line_num = first_line_num;
+    let mut infile_index = first_char_ind;
+    let mut inline_index = 0;
     let mut invalid_cols = Vec::new();
+    let mut num_chars = 0;
     let mut curr_len = 0;
     for character in chars {
         // if character is a newline, stop building line and append it to lines
@@ -26,11 +34,16 @@ fn string_to_lines(string: &str, max_line_len: u16, first_line_num: usize) -> Ve
             lines.push(DisplayLine {
                 line_content: line.iter().collect(),
                 line_num,
+                infile_index,
+                inline_index,
                 invalid_cols,
             });
             line = Vec::new();
             line_num += 1; // Only increment this for newline chars
+            infile_index += num_chars;
+            inline_index = 0;
             invalid_cols = Vec::new();
+            num_chars = 0;
             curr_len = 0;
             continue;
         }
@@ -46,15 +59,20 @@ fn string_to_lines(string: &str, max_line_len: u16, first_line_num: usize) -> Ve
                 lines.push(DisplayLine {
                     line_content: line.iter().collect(),
                     line_num,
+                    infile_index,
+                    inline_index,
                     invalid_cols,
                 });
                 line = Vec::new();
+                infile_index += num_chars;
+                inline_index += num_chars;
                 invalid_cols = Vec::new();
                 curr_len = 0;
             }
 
             // Render tab space as TAB_SIZE number of spaces
             line.push(' ');
+            num_chars += 1;
             for i in 1..tab_len {
                 line.push(' ');
                 invalid_cols.push(curr_len + 1 + i)
@@ -70,14 +88,19 @@ fn string_to_lines(string: &str, max_line_len: u16, first_line_num: usize) -> Ve
             lines.push(DisplayLine {
                 line_content: line.iter().collect(),
                 line_num,
+                infile_index,
+                inline_index,
                 invalid_cols,
             });
             line = Vec::new();
+            infile_index += num_chars;
+            inline_index += num_chars;
             invalid_cols = Vec::new();
             curr_len = 0;
         }
 
         line.push(character);
+        num_chars += 1;
         for i in 1..char_width {
             invalid_cols.push(curr_len + 1 + i)
         }
@@ -89,6 +112,8 @@ fn string_to_lines(string: &str, max_line_len: u16, first_line_num: usize) -> Ve
         lines.push(DisplayLine {
             line_content: line.iter().collect(),
             line_num,
+            infile_index,
+            inline_index,
             invalid_cols,
         });
     }
@@ -99,6 +124,8 @@ fn string_to_lines(string: &str, max_line_len: u16, first_line_num: usize) -> Ve
 pub struct DisplayLine {
     pub line_content: String,
     pub line_num: usize,
+    pub infile_index: usize, // Char index of the start of this displayed line in the total file
+    pub inline_index: usize, // Char index of the start of this displayed line in the file line
     pub invalid_cols: Vec<u16>, // used to ensure cursor is never in the middle of a multi-column character
 }
 
@@ -107,8 +134,8 @@ pub struct App<'a> {
     filename: &'a str,                 // Name of the file opened
     display_string: &'a str, // TEMP until buffer implemented. All references to this should be replaced by references to buffer.
     display_content: Vec<DisplayLine>, // Vector of DisplayLine structs representing content being displayed + useful info
-    first_line_num: usize,             // What is the infile line number of the first line loaded?
-    first_char_ind: usize, // What is the infile character index of the first character loaded?
+    first_line_num: usize, // What is the line number of the first line loaded? Used for line number display
+    first_char_ind: usize, // What is the infile character index of the first character loaded? Used for cursor indexing
     scroll_amount: u16,    // How far did we scroll down display_content?
     mode: Mode,
     ui_display: Vec<char>,  // Input taken from user for commands or searching
@@ -127,7 +154,7 @@ impl<'a> App<'a> {
         Self {
             filename,
             display_string,
-            display_content: string_to_lines(display_string, term_width - 2, 1),
+            display_content: string_to_lines(display_string, term_width - 2, 1, 0),
             first_line_num: 1,
             first_char_ind: 0,
             scroll_amount: 0,
@@ -169,6 +196,13 @@ impl<'a> App<'a> {
     pub fn get_cursor_pos(&self) -> (u16, u16) {
         return self.cursor_pos;
     }
+    /*
+    pub fn get_cursor_line_index(&self) -> u16 {
+        let line = self.display_content[(self.scroll_amount + self.cursor_pos.0) as usize - 1];
+        let invalid_cols = line.invalid_cols;
+        let num_skipped_cols = invalid_cols.iter().filter(|col| col < self.cursor_pos.1);
+    }
+    */
     pub fn get_term_size(&self) -> (u16, u16) {
         return self.term_size;
     }
@@ -197,8 +231,12 @@ impl<'a> App<'a> {
     pub fn update_term_size(&mut self, term_height: u16, term_width: u16) {
         self.term_size = (term_height, term_width);
         // TEMP: Future should use ref to buffer instead of display_string
-        self.display_content =
-            string_to_lines(self.display_string, term_width - 2, self.first_line_num);
+        self.display_content = string_to_lines(
+            self.display_string,
+            term_width - 2,
+            self.first_line_num,
+            self.first_char_ind,
+        );
 
         // Update cursor position if terminal size shrunk
         if self.cursor_pos.1 > self.term_right_cursor_bound() {
@@ -419,7 +457,7 @@ impl<'a> App<'a> {
 
     fn cursor_right(&mut self) {
         // display_content is 0-indexed, cursor_pos is 1-indexed
-        let line = &self.display_content[self.cursor_pos.0 as usize - 1];
+        let line = &self.display_content[(self.scroll_amount + self.cursor_pos.0) as usize - 1];
 
         // If cursor will move into the middle of a wide character (ex tab space) 'slip' it rightwards until the next character is valid
         let invalid_cols = &line.invalid_cols;
@@ -436,7 +474,7 @@ impl<'a> App<'a> {
         // If necessary, move to the start of the next line if available
         if self.cursor_pos.1 as u64 >= bound {
             // Edge case: small file, big terminal. End of file was reached
-            if (self.cursor_pos.0 as usize) == self.display_content.len() {
+            if ((self.scroll_amount + self.cursor_pos.0) as usize) == self.display_content.len() {
                 self.ui_display = "Error: End of file reached".chars().collect();
                 return;
             }
@@ -493,7 +531,8 @@ impl<'a> App<'a> {
 
     fn snap_cursor(&mut self) {
         // display_content is 0-indexed, cursor_pos is 1-indexed
-        let line = &self.display_content[self.cursor_pos.0 as usize - 1].line_content;
+        let line = &self.display_content[(self.scroll_amount + self.cursor_pos.0) as usize - 1]
+            .line_content;
 
         // Allow the cursor to move to the end of the line if in insertion mode
         let mut bound = width(line);
@@ -510,7 +549,9 @@ impl<'a> App<'a> {
 
     fn slip_cursor(&mut self) {
         // display_content is 0-indexed, cursor_pos is 1-indexed
-        let invalid_cols = &self.display_content[self.cursor_pos.0 as usize - 1].invalid_cols;
+        let invalid_cols = &self.display_content
+            [(self.scroll_amount + self.cursor_pos.0) as usize - 1]
+            .invalid_cols;
 
         // If cursor just moved into the middle of a wide character (ex tab space) 'slip' it leftwards to valid space
         while invalid_cols.contains(&self.cursor_pos.1) {
