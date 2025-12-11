@@ -196,10 +196,18 @@ impl<'a> App<'a> {
             // TO DO: Check if in insertion mode
             self.cursor_pos.1 = self.term_size.1 - 2;
         }
-        // TO DO: Snap cursor to end of line
         if self.cursor_pos.0 > self.term_size.0 - 4 {
             self.cursor_pos.0 = self.term_size.0 - 4;
         }
+
+        // Edge case if enlarging terminal window and unwrapping displayed text reduced number of rows occupied by text
+        if self.cursor_pos.0 > self.display_content.len() as u16 {
+            self.cursor_pos.0 = self.display_content.len() as u16;
+        }
+
+        // Ensure the cursor stays in a valid location
+        self.snap_cursor();
+        self.slip_cursor();
         // TO DO: Handle edge case where expand term width -> last line gets unwrapped -> cursor now outside of text
     }
 
@@ -239,42 +247,28 @@ impl<'a> App<'a> {
     fn cursor_up(&mut self) {
         if self.cursor_pos.0 > 1 {
             self.cursor_pos.0 = self.cursor_pos.0 - 1;
-            // display_content is 0-indexed, cursor_pos is 1-indexed
-            let new_line = &self.display_content[self.cursor_pos.0 as usize - 1];
 
-            // Snap cursor to end of line after moving up
-            let line_len = width(&new_line.line_content) as u16;
-            if line_len < self.cursor_pos.1 {
-                self.cursor_pos.1 = line_len;
-            }
+            // Snap cursor to end of line after moving down
+            self.snap_cursor();
 
             // If cursor just moved into the middle of a wide character (ex tab space) 'slip' it leftwards to valid space
-            let invalid_cols = &new_line.invalid_cols;
-            while invalid_cols.contains(&self.cursor_pos.1) {
-                self.cursor_pos.1 -= 1;
-            }
+            self.slip_cursor();
         } else {
             // TO DO: Scroll content upwards if available
         }
     }
 
     fn cursor_down(&mut self) {
-        if self.cursor_pos.0 < self.term_size.0 - 4 {
+        if self.cursor_pos.0 < self.term_size.0 - 4
+            && (self.cursor_pos.0 as usize) < self.display_content.len()
+        {
             self.cursor_pos.0 = self.cursor_pos.0 + 1;
-            // display_content is 0-indexed, cursor_pos is 1-indexed
-            let new_line = &self.display_content[self.cursor_pos.0 as usize - 1];
 
             // Snap cursor to end of line after moving down
-            let line_len = width(&new_line.line_content) as u16;
-            if line_len < self.cursor_pos.1 {
-                self.cursor_pos.1 = line_len;
-            }
+            self.snap_cursor();
 
             // If cursor just moved into the middle of a wide character (ex tab space) 'slip' it leftwards to valid space
-            let invalid_cols = &new_line.invalid_cols;
-            while invalid_cols.contains(&self.cursor_pos.1) {
-                self.cursor_pos.1 -= 1;
-            }
+            self.slip_cursor();
         } else {
             // TO DO: Scroll content upwards if available
         }
@@ -318,6 +312,22 @@ impl<'a> App<'a> {
             self.cursor_pos.1 -= 1;
         }
 
+        // If cursor just moved into the middle of a wide character (ex tab space) 'slip' it leftwards to valid space
+        self.slip_cursor();
+    }
+
+    fn snap_cursor(&mut self) {
+        // display_content is 0-indexed, cursor_pos is 1-indexed
+        let line = &self.display_content[self.cursor_pos.0 as usize - 1].line_content;
+
+        // Snap cursor to end of line after moving up
+        let line_len = width(line) as u16;
+        if line_len < self.cursor_pos.1 {
+            self.cursor_pos.1 = line_len;
+        }
+    }
+
+    fn slip_cursor(&mut self) {
         // display_content is 0-indexed, cursor_pos is 1-indexed
         let invalid_cols = &self.display_content[self.cursor_pos.0 as usize - 1].invalid_cols;
 
