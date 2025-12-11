@@ -40,7 +40,7 @@ fn string_to_lines(
             });
             line = Vec::new();
             line_num += 1; // Only increment this for newline chars
-            infile_index += num_chars;
+            infile_index += num_chars + 1;
             inline_index = 0;
             invalid_cols = Vec::new();
             num_chars = 0;
@@ -67,6 +67,7 @@ fn string_to_lines(
                 infile_index += num_chars;
                 inline_index += num_chars;
                 invalid_cols = Vec::new();
+                num_chars = 0;
                 curr_len = 0;
             }
 
@@ -96,6 +97,7 @@ fn string_to_lines(
             infile_index += num_chars;
             inline_index += num_chars;
             invalid_cols = Vec::new();
+            num_chars = 0;
             curr_len = 0;
         }
 
@@ -178,9 +180,6 @@ impl<'a> App<'a> {
     pub fn get_first_char_ind(&self) -> usize {
         return self.first_char_ind;
     }
-    pub fn get_scroll_amount(&self) -> u16 {
-        return self.scroll_amount;
-    }
     pub fn get_mode(&self) -> &str {
         match &self.mode {
             Mode::Normal => return "Normal Mode [i]=>Insert [:]=>Command [/]=>Search",
@@ -196,9 +195,15 @@ impl<'a> App<'a> {
     pub fn get_cursor_pos(&self) -> (u16, u16) {
         return self.cursor_pos;
     }
-
+    pub fn get_scroll_amount(&self) -> u16 {
+        return self.scroll_amount;
+    }
+    pub fn get_cursor_display_row(&self) -> usize {
+        // display_content is 0-indexed, cursor_pos is 1-indexed
+        return (self.scroll_amount + self.cursor_pos.0) as usize - 1;
+    }
     pub fn get_cursor_inline_index(&self) -> usize {
-        let line = &self.display_content[(self.scroll_amount + self.cursor_pos.0) as usize - 1];
+        let line = &self.display_content[self.get_cursor_display_row()];
         let invalid_cols = &line.invalid_cols;
         let num_skipped_cols = invalid_cols
             .iter()
@@ -208,6 +213,20 @@ impl<'a> App<'a> {
             return &line.inline_index + (self.cursor_pos.1 as usize) - num_skipped_cols - 1;
         } else {
             return &line.inline_index + (self.cursor_pos.1 as usize) - num_skipped_cols;
+        }
+    }
+
+    pub fn get_cursor_file_index(&self) -> usize {
+        let line = &self.display_content[self.get_cursor_display_row()];
+        let invalid_cols = &line.invalid_cols;
+        let num_skipped_cols = invalid_cols
+            .iter()
+            .filter(|col| col < &&self.cursor_pos.1)
+            .count();
+        if let Mode::Insert = self.mode {
+            return &line.infile_index + (self.cursor_pos.1 as usize) - num_skipped_cols - 1;
+        } else {
+            return &line.infile_index + (self.cursor_pos.1 as usize) - num_skipped_cols;
         }
     }
 
@@ -351,6 +370,8 @@ impl<'a> App<'a> {
     }
 
     fn insert_handle_key_event(&mut self, key_event: KeyEvent) {
+        // Clear any error/status messages once the user makes an input
+        self.ui_display = vec![];
         match key_event.code {
             KeyCode::Esc => {
                 self.ui_display = vec![];
@@ -465,8 +486,7 @@ impl<'a> App<'a> {
     }
 
     fn cursor_right(&mut self) {
-        // display_content is 0-indexed, cursor_pos is 1-indexed
-        let line = &self.display_content[(self.scroll_amount + self.cursor_pos.0) as usize - 1];
+        let line = &self.display_content[self.get_cursor_display_row()];
 
         // If cursor will move into the middle of a wide character (ex tab space) 'slip' it rightwards until the next character is valid
         let invalid_cols = &line.invalid_cols;
@@ -480,10 +500,10 @@ impl<'a> App<'a> {
             bound += 1;
         }
 
-        // If necessary, move to the start of the next line if available
+        // If cursor is at the right boundary, move to the start of the next line if available
         if self.cursor_pos.1 as u64 >= bound {
             // Edge case: small file, big terminal. End of file was reached
-            if ((self.scroll_amount + self.cursor_pos.0) as usize) == self.display_content.len() {
+            if (self.get_cursor_display_row() + 1) == self.display_content.len() {
                 self.ui_display = "Error: End of file reached".chars().collect();
                 return;
             }
@@ -497,8 +517,10 @@ impl<'a> App<'a> {
                         return;
                     }
                 };
+            } else {
+                // Only move up if did not scroll
+                self.cursor_pos.0 += 1;
             }
-            self.cursor_pos.0 += 1;
             self.cursor_pos.1 = 1;
         } else {
             self.cursor_pos.1 += 1;
@@ -517,12 +539,13 @@ impl<'a> App<'a> {
                         return;
                     }
                 };
+            } else {
+                // Only move down if did not scroll
+                self.cursor_pos.0 -= 1;
             }
 
-            self.cursor_pos.0 -= 1;
             // display_content is 0-indexed, cursor_pos is 1-indexed
-            let line = &self.display_content[(self.scroll_amount + self.cursor_pos.0) as usize - 1]
-                .line_content;
+            let line = &self.display_content[self.get_cursor_display_row()].line_content;
 
             // Allow the cursor to move to the end of the line if in insertion mode
             let mut bound = width(line);
@@ -541,8 +564,7 @@ impl<'a> App<'a> {
 
     fn snap_cursor(&mut self) {
         // display_content is 0-indexed, cursor_pos is 1-indexed
-        let line = &self.display_content[(self.scroll_amount + self.cursor_pos.0) as usize - 1]
-            .line_content;
+        let line = &self.display_content[self.get_cursor_display_row()].line_content;
 
         // Allow the cursor to move to the end of the line if in insertion mode
         let mut bound = width(line);
@@ -559,9 +581,7 @@ impl<'a> App<'a> {
 
     fn slip_cursor(&mut self) {
         // display_content is 0-indexed, cursor_pos is 1-indexed
-        let invalid_cols = &self.display_content
-            [(self.scroll_amount + self.cursor_pos.0) as usize - 1]
-            .invalid_cols;
+        let invalid_cols = &self.display_content[self.get_cursor_display_row()].invalid_cols;
 
         // If cursor just moved into the middle of a wide character (ex tab space) 'slip' it leftwards to valid space
         while invalid_cols.contains(&self.cursor_pos.1) {
