@@ -1,5 +1,5 @@
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
-use std::io;
+use std::{io, path::Display};
 use unicode_display_width::width;
 
 const TAB_SIZE: u16 = 4;
@@ -15,109 +15,78 @@ pub enum Mode {
 
 fn string_to_lines(
     string: &str,
-    max_line_len: u16,
+    term_width: u16,
     first_line_num: usize,
     first_char_ind: usize,
 ) -> Vec<DisplayLine> {
     let chars = string.chars();
+    let max_line_len = term_width - 2; // to accomodate the two borders
     let mut lines: Vec<DisplayLine> = Vec::new();
-    let mut line: Vec<char> = Vec::new();
-    let mut line_num = first_line_num;
-    let mut infile_index = first_char_ind;
-    let mut inline_index = 0;
-    let mut invalid_cols = Vec::new();
-    let mut num_chars = 0;
-    let mut curr_len = 0;
+    let mut line = DisplayLine::new(first_line_num, first_char_ind, 0);
+    let mut num_chars = 0; // Used for calculating file indexing
+    let mut total_char_width = 0; // Used to track how many characters can fit on a line
     for character in chars {
         // if character is a newline, stop building line and append it to lines
         if character == '\n' {
-            lines.push(DisplayLine {
-                line_content: line.iter().collect(),
-                line_num,
-                infile_index,
-                inline_index,
-                invalid_cols,
-            });
-            line = Vec::new();
-            line_num += 1; // Only increment this for newline chars
-            infile_index += num_chars + 1;
-            inline_index = 0;
-            invalid_cols = Vec::new();
+            lines.push(line);
+            let last_line = &lines[lines.len() - 1];
+            line = DisplayLine::new(
+                last_line.line_num + 1,
+                last_line.infile_index + num_chars,
+                0,
+            );
             num_chars = 0;
-            curr_len = 0;
+            total_char_width = 0;
             continue;
         }
 
-        // Handle tab spaces seperately due to dynamic sizing
-        if character == '\t' {
-            // Assume 4-space tabs
-            let tab_len = TAB_SIZE - (curr_len % TAB_SIZE);
-
-            // Check if tab needs to be rendered on a new line
-            if curr_len + tab_len > max_line_len {
-                // Doesn't fit so start a new line
-                lines.push(DisplayLine {
-                    line_content: line.iter().collect(),
-                    line_num,
-                    infile_index,
-                    inline_index,
-                    invalid_cols,
-                });
-                line = Vec::new();
-                infile_index += num_chars;
-                inline_index += num_chars;
-                invalid_cols = Vec::new();
-                num_chars = 0;
-                curr_len = 0;
-            }
-
-            // Render tab space as TAB_SIZE number of spaces
-            line.push(' ');
-            num_chars += 1;
-            for i in 1..tab_len {
-                line.push(' ');
-                invalid_cols.push(curr_len + 1 + i)
-            }
-            curr_len += tab_len;
-            continue;
-        }
+        // Get the number of columns required to display this character (ex. some emoticons take 2 columns)
+        let char_width = if character == '\t' {
+            // Handle tab spaces seperately due to dynamic sizing
+            TAB_SIZE - (total_char_width % TAB_SIZE)
+        } else {
+            width(&character.to_string()) as u16
+        };
 
         // Check if character needs to be rendered on a new line
-        let char_width = width(&character.to_string()) as u16;
-        if curr_len + char_width > max_line_len {
-            // Doesn't fit so start a new line
-            lines.push(DisplayLine {
-                line_content: line.iter().collect(),
-                line_num,
-                infile_index,
-                inline_index,
-                invalid_cols,
-            });
-            line = Vec::new();
-            infile_index += num_chars;
-            inline_index += num_chars;
-            invalid_cols = Vec::new();
+        if total_char_width + char_width > max_line_len {
+            // Character doesn't fit, so start a new line
+            lines.push(line);
+            let last_line = &lines[lines.len() - 1];
+            line = DisplayLine::new(
+                last_line.line_num,
+                last_line.infile_index + num_chars,
+                last_line.inline_index + num_chars,
+            );
             num_chars = 0;
-            curr_len = 0;
+            total_char_width = 0;
         }
 
-        line.push(character);
-        num_chars += 1;
-        for i in 1..char_width {
-            invalid_cols.push(curr_len + 1 + i)
+        // Add character to line to be rendered
+        if character == '\t' {
+            // Render tab space as a set of spaces
+            // while keeping track of which of them are 'invalid' for the cursor
+            line.line_content.push(' ');
+            num_chars += 1;
+            for i in 1..char_width {
+                line.line_content.push(' ');
+                line.invalid_cols.push(total_char_width + 1 + i)
+            }
+            total_char_width += char_width;
+        } else {
+            line.line_content.push(character);
+            num_chars += 1;
+            // Keep track of 'invalid columns' for cursor due to wide characters
+            for i in 1..char_width {
+                line.invalid_cols.push(total_char_width + 1 + i)
+            }
+            total_char_width += char_width;
         }
-        curr_len += char_width;
     }
 
     // Push the last line to lines
-    if curr_len > 0 {
-        lines.push(DisplayLine {
-            line_content: line.iter().collect(),
-            line_num,
-            infile_index,
-            inline_index,
-            invalid_cols,
-        });
+    if total_char_width > 0 {
+        lines.push(line);
     }
     return lines;
 }
@@ -129,6 +98,18 @@ pub struct DisplayLine {
     pub infile_index: usize, // Char index of the start of this displayed line in the total file
     pub inline_index: usize, // Char index of the start of this displayed line in the file line
     pub invalid_cols: Vec<u16>, // used to ensure cursor is never in the middle of a multi-column character
+}
+
+impl DisplayLine {
+    pub fn new(line_num: usize, infile_index: usize, inline_index: usize) -> Self {
+        Self {
+            line_content: String::new(),
+            line_num,
+            infile_index,
+            inline_index,
+            invalid_cols: vec![],
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -156,7 +137,7 @@ impl<'a> App<'a> {
         Self {
             filename,
             display_string,
-            display_content: string_to_lines(display_string, term_width - 2, 1, 0),
+            display_content: string_to_lines(display_string, term_width, 1, 0),
             first_line_num: 1,
             first_char_ind: 0,
             scroll_amount: 0,
@@ -260,7 +241,7 @@ impl<'a> App<'a> {
         // TEMP: Future should use ref to buffer instead of display_string
         self.display_content = string_to_lines(
             self.display_string,
-            term_width - 2,
+            term_width,
             self.first_line_num,
             self.first_char_ind,
         );
