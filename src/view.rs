@@ -10,6 +10,7 @@ use std::cmp::max;
 
 pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     let file_line = app.get_first_line_num();
+    let first_char_ind = app.get_first_char_ind();
     let scroll_amount = app.get_scroll_amount();
     let cursor_pos = app.get_cursor_pos();
 
@@ -17,7 +18,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     let display_lines = app.get_content();
     let app_mode = app.get_mode();
     let ui_message = app.get_ui_display();
-    let curr_row = display_lines[cursor_pos.0 as usize - 1].line_num;
+    let curr_row = display_lines[(scroll_amount + cursor_pos.0) as usize - 1].line_num;
 
     let layout = Layout::default()
         .direction(Direction::Vertical)
@@ -45,7 +46,9 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     }
     let display_content: Text = display_content.into();
 
-    let content = Paragraph::new(display_content).block(content_block);
+    let content = Paragraph::new(display_content)
+        .block(content_block)
+        .scroll((scroll_amount, 0));
     frame.render_widget(content, layout[0]);
 
     // Cursor Location

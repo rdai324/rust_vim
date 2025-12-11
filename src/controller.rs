@@ -107,8 +107,9 @@ pub struct App<'a> {
     filename: &'a str,                 // Name of the file opened
     display_string: &'a str, // TEMP until buffer implemented. All references to this should be replaced by references to buffer.
     display_content: Vec<DisplayLine>, // Vector of DisplayLine structs representing content being displayed + useful info
-    first_line_num: usize, // Which line of the file corresponds to the first line of text loaded into display_content
-    scroll_amount: usize,  // How far did we scroll down display_content?
+    first_line_num: usize,             // What is the infile line number of the first line loaded?
+    first_char_ind: usize, // What is the infile character index of the first character loaded?
+    scroll_amount: u16,    // How far did we scroll down display_content?
     mode: Mode,
     ui_display: Vec<char>,  // Input taken from user for commands or searching
     cursor_pos: (u16, u16), // cursor position in terminal. (y, x), or (row, col), with 1,1 being the top-left corner (1 not 0 due to border)
@@ -128,6 +129,7 @@ impl<'a> App<'a> {
             display_string,
             display_content: string_to_lines(display_string, term_width - 2, 1),
             first_line_num: 1,
+            first_char_ind: 0,
             scroll_amount: 0,
             mode: Mode::Normal,
             ui_display: vec![],
@@ -146,7 +148,10 @@ impl<'a> App<'a> {
     pub fn get_first_line_num(&self) -> usize {
         return self.first_line_num;
     }
-    pub fn get_scroll_amount(&self) -> usize {
+    pub fn get_first_char_ind(&self) -> usize {
+        return self.first_char_ind;
+    }
+    pub fn get_scroll_amount(&self) -> u16 {
         return self.scroll_amount;
     }
     pub fn get_mode(&self) -> &str {
@@ -277,9 +282,9 @@ impl<'a> App<'a> {
             KeyCode::Enter => {
                 let command: String = self.ui_display.iter().collect();
                 match command.as_str() {
-                    ":w" | ":write" => { /* TO DO */ }
-                    ":q" | ":quit" => self.exit(),
-                    ":wq" => { /* TO DO */ }
+                    ":w" | ":W" | ":write" => { /* TO DO */ }
+                    ":q" | ":Q" | ":quit" => self.exit(),
+                    ":wq" | ":WQ" => { /* TO DO */ }
                     ":set num" | ":set nu" | ":num" | ":nu" => {}
                     _ => {
                         let error_msg = String::from("Error: Invalid Command");
@@ -346,6 +351,28 @@ impl<'a> App<'a> {
         }
     }
 
+    fn scroll_up(&mut self) -> Result<(), &str> {
+        if self.scroll_amount > 0 {
+            self.scroll_amount -= 1;
+            return Ok(());
+        } else {
+            // TO DO: Ask buffer to read in another line from rope, then push out a line from other end
+            return Err("Error: Start of file reached");
+        }
+    }
+
+    fn scroll_down(&mut self) -> Result<(), &str> {
+        let max_scroll_amount = self.display_content.len()
+            - (self.term_bottom_cursor_bound() - self.term_top_cursor_bound() + 1) as usize;
+        if (self.scroll_amount as usize) < max_scroll_amount {
+            self.scroll_amount += 1;
+            return Ok(());
+        } else {
+            // TO DO: Ask buffer to read in another line from rope, then push out a line from other end
+            return Err("Error: End of file reached");
+        }
+    }
+
     fn cursor_up(&mut self) {
         if self.cursor_pos.0 > self.term_top_cursor_bound() {
             self.cursor_pos.0 -= 1;
@@ -356,14 +383,21 @@ impl<'a> App<'a> {
             // If cursor just moved into the middle of a wide character (ex tab space) 'slip' it leftwards to valid space
             self.slip_cursor();
         } else {
-            // TO DO: Scroll content upwards if available
+            match self.scroll_up() {
+                Ok(_) => {}
+                Err(msg) => self.ui_display = msg.chars().collect(),
+            };
         }
     }
 
     fn cursor_down(&mut self) {
-        if self.cursor_pos.0 < self.term_bottom_cursor_bound()
-            && (self.cursor_pos.0 as usize) < self.display_content.len()
-        {
+        // Edge case: small file, big terminal. End of file was reached
+        if (self.cursor_pos.0 as usize) == self.display_content.len() {
+            self.ui_display = "Error: End of file reached".chars().collect();
+            return;
+        }
+
+        if self.cursor_pos.0 < self.term_bottom_cursor_bound() {
             self.cursor_pos.0 += 1;
 
             // Snap cursor to end of line after moving down
@@ -372,7 +406,10 @@ impl<'a> App<'a> {
             // If cursor just moved into the middle of a wide character (ex tab space) 'slip' it leftwards to valid space
             self.slip_cursor();
         } else {
-            // TO DO: Scroll content upwards if available
+            match self.scroll_down() {
+                Ok(_) => {}
+                Err(msg) => self.ui_display = msg.chars().collect(),
+            };
         }
     }
 
@@ -388,14 +425,24 @@ impl<'a> App<'a> {
 
         // If the cursor is at the end of the line, move to the start of the next line if available
         if self.cursor_pos.1 as u64 >= width(&line.line_content) {
-            if self.cursor_pos.0 < self.term_bottom_cursor_bound()
-                && (self.cursor_pos.0 as usize) < self.display_content.len()
-            {
-                self.cursor_pos.0 += 1;
-                self.cursor_pos.1 = 1;
-            } else {
-                // TO DO: attempt to scroll the buffer
+            // Edge case: small file, big terminal. End of file was reached
+            if (self.cursor_pos.0 as usize) == self.display_content.len() {
+                self.ui_display = "Error: End of file reached".chars().collect();
+                return;
             }
+
+            // If scrolling needed, try to do so
+            if self.cursor_pos.0 == self.term_bottom_cursor_bound() {
+                match self.scroll_down() {
+                    Ok(_) => {}
+                    Err(msg) => {
+                        self.ui_display = msg.chars().collect();
+                        return;
+                    }
+                };
+            }
+            self.cursor_pos.0 += 1;
+            self.cursor_pos.1 = 1;
         } else {
             self.cursor_pos.1 += 1;
         }
@@ -404,14 +451,21 @@ impl<'a> App<'a> {
     fn cursor_left(&mut self) {
         // If the cursor is at the start of the line, move to the end of the previous line if available
         if self.cursor_pos.1 == self.term_left_cursor_bound() {
-            if self.cursor_pos.0 > self.term_top_cursor_bound() {
-                self.cursor_pos.0 -= 1;
-                // display_content is 0-indexed, cursor_pos is 1-indexed
-                let line = &self.display_content[self.cursor_pos.0 as usize - 1].line_content;
-                self.cursor_pos.1 = width(line) as u16;
-            } else {
-                // TO DO: attempt to scroll the buffer
+            // If scrolling needed, try to do so
+            if self.cursor_pos.0 == self.term_top_cursor_bound() {
+                match self.scroll_up() {
+                    Ok(_) => {}
+                    Err(msg) => {
+                        self.ui_display = msg.chars().collect();
+                        return;
+                    }
+                };
             }
+
+            self.cursor_pos.0 -= 1;
+            // display_content is 0-indexed, cursor_pos is 1-indexed
+            let line = &self.display_content[self.cursor_pos.0 as usize - 1].line_content;
+            self.cursor_pos.1 = width(line) as u16;
         } else {
             self.cursor_pos.1 -= 1;
         }
