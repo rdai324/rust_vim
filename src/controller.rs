@@ -239,6 +239,7 @@ impl<'a> App<'a> {
     fn cursor_up(&mut self) {
         if self.cursor_pos.0 > 1 {
             self.cursor_pos.0 = self.cursor_pos.0 - 1;
+            // display_content is 0-indexed, cursor_pos is 1-indexed
             let new_line = &self.display_content[self.cursor_pos.0 as usize - 1];
 
             // Snap cursor to end of line after moving up
@@ -260,6 +261,7 @@ impl<'a> App<'a> {
     fn cursor_down(&mut self) {
         if self.cursor_pos.0 < self.term_size.0 - 4 {
             self.cursor_pos.0 = self.cursor_pos.0 + 1;
+            // display_content is 0-indexed, cursor_pos is 1-indexed
             let new_line = &self.display_content[self.cursor_pos.0 as usize - 1];
 
             // Snap cursor to end of line after moving down
@@ -279,10 +281,49 @@ impl<'a> App<'a> {
     }
 
     fn cursor_right(&mut self) {
-        self.cursor_pos.1 = cmp::min(self.cursor_pos.1 + 1, self.term_size.1 - 2);
+        // display_content is 0-indexed, cursor_pos is 1-indexed
+        let line = &self.display_content[self.cursor_pos.0 as usize - 1];
+
+        // If cursor will move into the middle of a wide character (ex tab space) 'slip' it rightwards until the next character is valid
+        let invalid_cols = &line.invalid_cols;
+        while invalid_cols.contains(&(self.cursor_pos.1 + 1)) {
+            self.cursor_pos.1 += 1;
+        }
+
+        // If the cursor is at the end of the line, move to the start of the next line if available
+        if self.cursor_pos.1 as u64 >= width(&line.line_content) {
+            if (self.cursor_pos.0 as usize) < self.display_content.len() {
+                self.cursor_pos.0 += 1;
+                self.cursor_pos.1 = 1;
+            } else {
+                // TO DO: attempt to scroll the buffer
+            }
+        } else {
+            self.cursor_pos.1 += 1;
+        }
     }
 
     fn cursor_left(&mut self) {
-        self.cursor_pos.1 = cmp::max(self.cursor_pos.1 - 1, 1);
+        // If the cursor is at the start of the line, move to the end of the previous line
+        if self.cursor_pos.1 == 1 {
+            if self.cursor_pos.0 > 1 {
+                self.cursor_pos.0 -= 1;
+                // display_content is 0-indexed, cursor_pos is 1-indexed
+                let line = &self.display_content[self.cursor_pos.0 as usize - 1].line_content;
+                self.cursor_pos.1 = width(line) as u16;
+            } else {
+                // TO DO: attempt to scroll the buffer
+            }
+        } else {
+            self.cursor_pos.1 -= 1;
+        }
+
+        // display_content is 0-indexed, cursor_pos is 1-indexed
+        let invalid_cols = &self.display_content[self.cursor_pos.0 as usize - 1].invalid_cols;
+
+        // If cursor just moved into the middle of a wide character (ex tab space) 'slip' it leftwards to valid space
+        while invalid_cols.contains(&self.cursor_pos.1) {
+            self.cursor_pos.1 -= 1;
+        }
     }
 }

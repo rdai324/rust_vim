@@ -22,9 +22,9 @@ fn main() -> io::Result<()> {
     let mut dummy_file_name = String::from("Bee_Movie.txt");
     let mut dummy_string = String::from(
         "According to all known laws of aviation, there is no way a bee should be able to fly.\nIts wings are too small to get its fat little body off the ground.
-\tThe bee, of course, flies anyway because bees don't care what humans think is impossible.
+\tThe bee, of course, flies anyway because bees don't care what humans think is impossible.\t😀
 Yellow,\tblack.\tYellow, black. Yellow, black. Yellow, black.
-Ooh, black and yellow!
+Ooh,😀black and yellow!
 \tLet's shake it up a little.
 a\tBarry! Breakfast is ready!
         Coming!
