@@ -1,5 +1,6 @@
 use crate::App;
 use count_digits::{self, CountDigits};
+use crossterm::{cursor::SetCursorStyle, execute};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Position};
 use ratatui::style::{Color, Modifier, Style, Stylize};
@@ -7,6 +8,7 @@ use ratatui::symbols::border;
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Borders, Paragraph};
 use std::cmp::max;
+use std::io::stdout;
 
 pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     let file_line = app.get_first_line_num();
@@ -77,5 +79,10 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     frame.render_widget(Paragraph::new(ui_content).block(ui_block), bottom_layout[1]);
 
     // Render cursor
+    if app_mode.contains("Insertion") {
+        execute!(stdout(), SetCursorStyle::BlinkingBar).unwrap();
+    } else {
+        execute!(stdout(), SetCursorStyle::BlinkingBlock).unwrap();
+    }
     frame.set_cursor_position(Position::new(cursor_pos.1, cursor_pos.0));
 }

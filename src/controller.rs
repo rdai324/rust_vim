@@ -314,6 +314,10 @@ impl<'a> App<'a> {
             KeyCode::Enter => { /* TO DO */ }
             KeyCode::Tab => { /* TO DO */ }
             KeyCode::Char(character) => { /* TO DO */ }
+            KeyCode::Up => self.cursor_up(),
+            KeyCode::Down => self.cursor_down(),
+            KeyCode::Left => self.cursor_left(),
+            KeyCode::Right => self.cursor_right(),
             _ => {}
         }
     }
@@ -423,8 +427,14 @@ impl<'a> App<'a> {
             self.cursor_pos.1 += 1;
         }
 
-        // If the cursor is at the end of the line, move to the start of the next line if available
-        if self.cursor_pos.1 as u64 >= width(&line.line_content) {
+        // Allow the cursor to move to the end of the line if in insertion mode
+        let mut bound = width(&line.line_content);
+        if let Mode::Insert = self.mode {
+            bound += 1;
+        }
+
+        // If necessary, move to the start of the next line if available
+        if self.cursor_pos.1 as u64 >= bound {
             // Edge case: small file, big terminal. End of file was reached
             if (self.cursor_pos.0 as usize) == self.display_content.len() {
                 self.ui_display = "Error: End of file reached".chars().collect();
@@ -465,7 +475,14 @@ impl<'a> App<'a> {
             self.cursor_pos.0 -= 1;
             // display_content is 0-indexed, cursor_pos is 1-indexed
             let line = &self.display_content[self.cursor_pos.0 as usize - 1].line_content;
-            self.cursor_pos.1 = width(line) as u16;
+
+            // Allow the cursor to move to the end of the line if in insertion mode
+            let mut bound = width(line);
+            if let Mode::Insert = self.mode {
+                bound += 1;
+            }
+
+            self.cursor_pos.1 = bound as u16;
         } else {
             self.cursor_pos.1 -= 1;
         }
@@ -478,8 +495,14 @@ impl<'a> App<'a> {
         // display_content is 0-indexed, cursor_pos is 1-indexed
         let line = &self.display_content[self.cursor_pos.0 as usize - 1].line_content;
 
+        // Allow the cursor to move to the end of the line if in insertion mode
+        let mut bound = width(line);
+        if let Mode::Insert = self.mode {
+            bound += 1;
+        }
+
         // Snap cursor to end of line after moving up
-        let line_len = width(line) as u16;
+        let line_len = bound as u16;
         if line_len < self.cursor_pos.1 {
             self.cursor_pos.1 = line_len;
         }
