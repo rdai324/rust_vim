@@ -196,13 +196,21 @@ impl<'a> App<'a> {
     pub fn get_cursor_pos(&self) -> (u16, u16) {
         return self.cursor_pos;
     }
-    /*
-    pub fn get_cursor_line_index(&self) -> u16 {
-        let line = self.display_content[(self.scroll_amount + self.cursor_pos.0) as usize - 1];
-        let invalid_cols = line.invalid_cols;
-        let num_skipped_cols = invalid_cols.iter().filter(|col| col < self.cursor_pos.1);
+
+    pub fn get_cursor_inline_index(&self) -> usize {
+        let line = &self.display_content[(self.scroll_amount + self.cursor_pos.0) as usize - 1];
+        let invalid_cols = &line.invalid_cols;
+        let num_skipped_cols = invalid_cols
+            .iter()
+            .filter(|col| col < &&self.cursor_pos.1)
+            .count();
+        if let Mode::Insert = self.mode {
+            return &line.inline_index + (self.cursor_pos.1 as usize) - num_skipped_cols - 1;
+        } else {
+            return &line.inline_index + (self.cursor_pos.1 as usize) - num_skipped_cols;
+        }
     }
-    */
+
     pub fn get_term_size(&self) -> (u16, u16) {
         return self.term_size;
     }
@@ -347,6 +355,7 @@ impl<'a> App<'a> {
             KeyCode::Esc => {
                 self.ui_display = vec![];
                 self.mode = Mode::Normal;
+                self.snap_cursor();
             }
             KeyCode::Backspace => { /* TO DO */ }
             KeyCode::Enter => { /* TO DO */ }
@@ -512,7 +521,8 @@ impl<'a> App<'a> {
 
             self.cursor_pos.0 -= 1;
             // display_content is 0-indexed, cursor_pos is 1-indexed
-            let line = &self.display_content[self.cursor_pos.0 as usize - 1].line_content;
+            let line = &self.display_content[(self.scroll_amount + self.cursor_pos.0) as usize - 1]
+                .line_content;
 
             // Allow the cursor to move to the end of the line if in insertion mode
             let mut bound = width(line);

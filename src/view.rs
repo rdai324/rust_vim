@@ -19,7 +19,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     let app_mode = app.get_mode();
     let ui_message = app.get_ui_display();
     let curr_row = display_lines[(scroll_amount + cursor_pos.0) as usize - 1].line_num;
-    let curr_col = display_lines[(scroll_amount + cursor_pos.0) as usize - 1].inline_index;
+    let curr_col = app.get_cursor_inline_index();
 
     let layout = Layout::default()
         .direction(Direction::Vertical)
