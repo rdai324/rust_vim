@@ -43,7 +43,7 @@ fn string_to_lines(string: &str, max_line_len: u16, first_line_num: usize) -> Ve
             let tab_len = 4 - (curr_len % 4);
 
             // Check if tab needs to be rendered on a new line
-            if curr_len + tab_len > max_line_len as u64 {
+            if curr_len + tab_len > max_line_len {
                 // Doesn't fit so start a new line
                 lines.push(DisplayLine {
                     line_content: line.iter().collect(),
@@ -69,8 +69,8 @@ fn string_to_lines(string: &str, max_line_len: u16, first_line_num: usize) -> Ve
         }
 
         // Check if character needs to be rendered on a new line
-        let char_width = width(&character.to_string());
-        if curr_len + char_width > max_line_len as u64 {
+        let char_width = width(&character.to_string()) as u16;
+        if curr_len + char_width > max_line_len {
             // Doesn't fit so start a new line
             lines.push(DisplayLine {
                 line_content: line.iter().collect(),
@@ -108,8 +108,8 @@ fn string_to_lines(string: &str, max_line_len: u16, first_line_num: usize) -> Ve
 pub struct DisplayLine {
     pub line_content: String,
     pub line_num: usize,
-    pub char_widths: Vec<u64>, // used for left/right stepping and end-of-line snapping
-    pub invalid_cols: Vec<u64>, // used to ensure cursor is never in the middle of a multi-column character
+    pub char_widths: Vec<u16>, // used for left/right stepping and end-of-line snapping
+    pub invalid_cols: Vec<u16>, // used to ensure cursor is never in the middle of a multi-column character
 }
 
 #[derive(Debug)]
@@ -187,6 +187,7 @@ impl<'a> App<'a> {
 
     pub fn update_term_size(&mut self, term_height: u16, term_width: u16) {
         self.term_size = (term_height, term_width);
+        // TEMP: Future should use ref to buffer instead of display_string
         self.display_content =
             string_to_lines(self.display_string, term_width - 2, self.display_file_line);
 
@@ -238,14 +239,42 @@ impl<'a> App<'a> {
     fn cursor_up(&mut self) {
         if self.cursor_pos.0 > 1 {
             self.cursor_pos.0 = self.cursor_pos.0 - 1;
+            let new_line = &self.display_content[self.cursor_pos.0 as usize - 1];
+
+            // Snap cursor to end of line after moving up
+            let line_len = width(&new_line.line_content) as u16;
+            if line_len < self.cursor_pos.1 {
+                self.cursor_pos.1 = line_len;
+            }
+
+            // If cursor just moved into the middle of a wide character (ex tab space) 'slip' it leftwards to valid space
+            let invalid_cols = &new_line.invalid_cols;
+            while invalid_cols.contains(&self.cursor_pos.1) {
+                self.cursor_pos.1 -= 1;
+            }
         } else {
-            // Scroll content upwards if available
+            // TO DO: Scroll content upwards if available
         }
     }
 
     fn cursor_down(&mut self) {
         if self.cursor_pos.0 < self.term_size.0 - 4 {
             self.cursor_pos.0 = self.cursor_pos.0 + 1;
+            let new_line = &self.display_content[self.cursor_pos.0 as usize - 1];
+
+            // Snap cursor to end of line after moving down
+            let line_len = width(&new_line.line_content) as u16;
+            if line_len < self.cursor_pos.1 {
+                self.cursor_pos.1 = line_len;
+            }
+
+            // If cursor just moved into the middle of a wide character (ex tab space) 'slip' it leftwards to valid space
+            let invalid_cols = &new_line.invalid_cols;
+            while invalid_cols.contains(&self.cursor_pos.1) {
+                self.cursor_pos.1 -= 1;
+            }
+        } else {
+            // TO DO: Scroll content upwards if available
         }
     }
 
@@ -254,6 +283,6 @@ impl<'a> App<'a> {
     }
 
     fn cursor_left(&mut self) {
-        self.cursor_pos.1 = cmp::max(self.cursor_pos.1 - 1, 1); // TO DO: Update when line numbers implemented
+        self.cursor_pos.1 = cmp::max(self.cursor_pos.1 - 1, 1);
     }
 }
