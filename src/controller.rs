@@ -110,7 +110,7 @@ pub struct App<'a> {
     first_line_num: usize, // Which line of the file corresponds to the first line of text loaded into display_content
     scroll_amount: usize,  // How far did we scroll down display_content?
     mode: Mode,
-    ui_display: String,     // Input taken from user for commands or searching
+    ui_display: Vec<char>,  // Input taken from user for commands or searching
     cursor_pos: (u16, u16), // cursor position in terminal. (y, x), or (row, col), with 1,1 being the top-left corner (1 not 0 due to border)
     term_size: (u16, u16),  // Terminal size
     running: bool,
@@ -130,7 +130,7 @@ impl<'a> App<'a> {
             first_line_num: 1,
             scroll_amount: 0,
             mode: Mode::Normal,
-            ui_display: String::from(""),
+            ui_display: vec![],
             cursor_pos: (1, 1),
             term_size: (term_height, term_width),
             running: true,
@@ -151,15 +151,15 @@ impl<'a> App<'a> {
     }
     pub fn get_mode(&self) -> &str {
         match &self.mode {
-            Mode::Normal => return "Normal Mode",
-            Mode::Command => return "Command Mode",
-            Mode::SearchInput => return "Search Mode",
-            Mode::Search => return "Search Mode",
-            Mode::Insert => return "Insertion Mode",
+            Mode::Normal => return "Normal Mode [i]=>Insert [:]=>Command [/]=>Search",
+            Mode::Command => return "Command Mode [ENTER]=>Submit [ESC]=>Exit",
+            Mode::SearchInput => return "Search Mode [ENTER]=>Submit [ESC]=>Exit",
+            Mode::Search => return "Search Mode [n]=>Next [p]=>Prev [ESC]=>Exit",
+            Mode::Insert => return "Insertion Mode [ESC]=>Exit",
         }
     }
-    pub fn get_ui_display(&self) -> &str {
-        return &self.ui_display;
+    pub fn get_ui_display(&self) -> String {
+        return self.ui_display.iter().collect();
     }
     pub fn get_cursor_pos(&self) -> (u16, u16) {
         return self.cursor_pos;
@@ -238,14 +238,112 @@ impl<'a> App<'a> {
      * Handles key press events specifically
      */
     fn handle_key_event(&mut self, key_event: KeyEvent) {
+        match self.mode {
+            Mode::Command => self.command_handle_key_event(key_event),
+            Mode::Insert => self.insert_handle_key_event(key_event),
+            Mode::Normal => self.normal_handle_key_event(key_event),
+            Mode::SearchInput => self.search_input_handle_key_event(key_event),
+            Mode::Search => self.search_handle_key_event(key_event),
+        }
+    }
+
+    fn normal_handle_key_event(&mut self, key_event: KeyEvent) {
+        // Clear any error/status messages once the user makes an input
+        self.ui_display = vec![];
         match key_event.code {
-            KeyCode::Char('q') => self.exit(), // Temp exit command until the controller is implemented
+            KeyCode::Char('i') => self.mode = Mode::Insert,
+            KeyCode::Char(':') => {
+                self.mode = Mode::Command;
+                self.ui_display = vec![':'];
+            }
+            KeyCode::Char('/') => {
+                self.mode = Mode::SearchInput;
+                self.ui_display = vec!['/'];
+            }
             KeyCode::Up => self.cursor_up(),
             KeyCode::Down => self.cursor_down(),
             KeyCode::Left => self.cursor_left(),
             KeyCode::Right => self.cursor_right(),
-            _ => { /* To be implemented */ }
+            _ => {}
         };
+    }
+
+    fn command_handle_key_event(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Esc => {
+                self.ui_display = vec![];
+                self.mode = Mode::Normal;
+            }
+            KeyCode::Enter => {
+                let command: String = self.ui_display.iter().collect();
+                match command.as_str() {
+                    ":w" | ":write" => { /* TO DO */ }
+                    ":q" | ":quit" => self.exit(),
+                    ":wq" => { /* TO DO */ }
+                    ":set num" | ":set nu" | ":num" | ":nu" => {}
+                    _ => {
+                        let error_msg = String::from("Error: Invalid Command");
+                        self.ui_display = error_msg.chars().collect();
+                    }
+                }
+                self.mode = Mode::Normal;
+            }
+            KeyCode::Backspace => {
+                self.ui_display.pop();
+                if self.ui_display.len() == 0 {
+                    self.mode = Mode::Normal;
+                }
+            }
+            KeyCode::Char(character) => self.ui_display.push(character),
+            _ => {}
+        }
+    }
+
+    fn insert_handle_key_event(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Esc => {
+                self.ui_display = vec![];
+                self.mode = Mode::Normal;
+            }
+            KeyCode::Backspace => { /* TO DO */ }
+            KeyCode::Enter => { /* TO DO */ }
+            KeyCode::Tab => { /* TO DO */ }
+            KeyCode::Char(character) => { /* TO DO */ }
+            _ => {}
+        }
+    }
+
+    fn search_input_handle_key_event(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Esc => {
+                self.ui_display = vec![];
+                self.mode = Mode::Normal;
+            }
+            KeyCode::Enter => {
+                // TO DO: Actually perform the search. Only transition to search mode if matches found
+                self.mode = Mode::Search
+            }
+            KeyCode::Backspace => {
+                self.ui_display.pop();
+                if self.ui_display.len() == 0 {
+                    self.mode = Mode::Normal;
+                }
+            }
+            KeyCode::Char(character) => self.ui_display.push(character),
+            _ => {}
+        }
+    }
+
+    fn search_handle_key_event(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Esc => {
+                self.ui_display = vec![];
+                self.mode = Mode::Normal;
+            }
+            KeyCode::Char('n') => { /* TO DO*/ }
+            KeyCode::Char('p') => { /*TO DO*/ }
+            _ => {}
+        }
     }
 
     fn cursor_up(&mut self) {

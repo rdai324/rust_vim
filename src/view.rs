@@ -62,7 +62,13 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
             .add_modifier(Modifier::BOLD),
     )
     .centered();
-    let ui_text = Line::styled(ui_message, Style::default().fg(Color::White)).centered();
+    let ui_text: Line;
+    if ui_message.contains("Error") {
+        ui_text =
+            Line::styled(ui_message, Style::default().fg(Color::White).bg(Color::Red)).centered();
+    } else {
+        ui_text = Line::styled(ui_message, Style::default().fg(Color::White)).centered();
+    }
     let ui_content: Text = vec![mode_text, ui_text].into();
     let ui_block = Block::new().borders(Borders::LEFT);
     frame.render_widget(Paragraph::new(ui_content).block(ui_block), bottom_layout[1]);
