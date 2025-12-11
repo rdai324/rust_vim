@@ -1,5 +1,6 @@
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
-use std::{io, path::Display};
+use std::cmp;
+use std::io;
 use unicode_display_width::width;
 
 const TAB_SIZE: u16 = 4;
@@ -11,6 +12,7 @@ pub enum Mode {
     SearchInput,
     Search,
     Insert,
+    Minimized, //Used to prevent cursor out of bounds crash when terminal is shrunk to <=4 lines tall
 }
 
 fn string_to_lines(
@@ -192,6 +194,7 @@ impl<'a> App<'a> {
             Mode::SearchInput => return "Search Mode [ENTER]=>Submit [ESC]=>Exit",
             Mode::Search => return "Search Mode [n]=>Next [p]=>Prev [ESC]=>Exit",
             Mode::Insert => return "Insertion Mode [ESC]=>Exit",
+            Mode::Minimized => return "Please Enlarge Terminal Window",
         }
     }
 
@@ -259,6 +262,18 @@ impl<'a> App<'a> {
      */
     pub fn update_term_size(&mut self, term_height: u16, term_width: u16) {
         self.term_size = (term_height, term_width);
+
+        if term_height <= 4 {
+            self.mode = Mode::Minimized;
+            self.cursor_pos = (1, 1);
+            return;
+        }
+        if let Mode::Minimized = self.mode {
+            if term_height > 4 {
+                self.mode = Mode::Normal;
+            }
+        }
+
         // TEMP: Future should use ref to buffer instead of display_string
         self.display_content = string_to_lines(
             self.display_string,
@@ -278,7 +293,7 @@ impl<'a> App<'a> {
 
         // Edge case if enlarging terminal window and unwrapping displayed text reduced number of rows occupied by text
         if self.cursor_pos.0 > self.display_content.len() as u16 {
-            // TO DO: Attempt to scroll and/or load into buffer before giving up and shifting cursor back up
+            // TO DO: Attempt to load into buffer before giving up and shifting cursor back up
             self.cursor_pos.0 = self.display_content.len() as u16;
         }
 
@@ -326,6 +341,7 @@ impl<'a> App<'a> {
             Mode::Normal => self.normal_handle_key_event(key_event),
             Mode::SearchInput => self.search_input_handle_key_event(key_event),
             Mode::Search => self.search_handle_key_event(key_event),
+            Mode::Minimized => {}
         }
     }
 
