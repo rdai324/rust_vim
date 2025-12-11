@@ -121,7 +121,8 @@ pub struct App<'a> {
     first_char_ind: usize, // What is the infile character index of the first character loaded? Used for cursor indexing
     scroll_amount: u16,    // How far did we scroll down display_content?
     mode: Mode,
-    ui_display: Vec<char>,  // Input taken from user for commands or searching
+    msg_display: Vec<char>, // Input taken from user for commands or searching
+    search_term: Option<String>, // What is being searched for in search mode. Only assigned on successful match for View highlighting
     cursor_pos: (u16, u16), // cursor position in terminal. (y, x), or (row, col), with 1,1 being the top-left corner (1 not 0 due to border)
     term_size: (u16, u16),  // Terminal size
     running: bool,
@@ -142,13 +143,17 @@ impl<'a> App<'a> {
             first_char_ind: 0,
             scroll_amount: 0,
             mode: Mode::Normal,
-            ui_display: vec![],
+            msg_display: vec![],
+            search_term: None,
             cursor_pos: (1, 1),
             term_size: (term_height, term_width),
             running: true,
         }
     }
 
+    /*
+     * Get ___ methods below:
+     */
     pub fn get_filename(&self) -> &str {
         return self.filename;
     }
@@ -161,7 +166,26 @@ impl<'a> App<'a> {
     pub fn get_first_char_ind(&self) -> usize {
         return self.first_char_ind;
     }
-    pub fn get_mode(&self) -> &str {
+    pub fn get_msg_display(&self) -> String {
+        return self.msg_display.iter().collect();
+    }
+    pub fn get_cursor_pos(&self) -> (u16, u16) {
+        return self.cursor_pos;
+    }
+    pub fn get_scroll_amount(&self) -> u16 {
+        return self.scroll_amount;
+    }
+    pub fn get_term_size(&self) -> (u16, u16) {
+        return self.term_size;
+    }
+    pub fn get_search_term(&self) -> &Option<String> {
+        return &self.search_term;
+    }
+
+    /*
+     * Used by View to show the current mode, and important inputs
+     */
+    pub fn get_mode_text(&self) -> &str {
         match &self.mode {
             Mode::Normal => return "Normal Mode [i]=>Insert [:]=>Command [/]=>Search",
             Mode::Command => return "Command Mode [ENTER]=>Submit [ESC]=>Exit",
@@ -170,19 +194,17 @@ impl<'a> App<'a> {
             Mode::Insert => return "Insertion Mode [ESC]=>Exit",
         }
     }
-    pub fn get_ui_display(&self) -> String {
-        return self.ui_display.iter().collect();
-    }
-    pub fn get_cursor_pos(&self) -> (u16, u16) {
-        return self.cursor_pos;
-    }
-    pub fn get_scroll_amount(&self) -> u16 {
-        return self.scroll_amount;
-    }
+
+    /*
+     * Used to index app's DisplayContent vector using cursor coordinates and scroll amount
+     */
     pub fn get_cursor_display_row(&self) -> usize {
         // display_content is 0-indexed, cursor_pos is 1-indexed
         return (self.scroll_amount + self.cursor_pos.0) as usize - 1;
     }
+    /*
+     * Used to get which column of the file line the cursor is currently located at
+     */
     pub fn get_cursor_inline_index(&self) -> usize {
         let line = &self.display_content[self.get_cursor_display_row()];
         let invalid_cols = &line.invalid_cols;
@@ -197,6 +219,9 @@ impl<'a> App<'a> {
         }
     }
 
+    /*
+     * Used to get the character index of the cursor in the entire file
+     */
     pub fn get_cursor_file_index(&self) -> usize {
         let line = &self.display_content[self.get_cursor_display_row()];
         let invalid_cols = &line.invalid_cols;
@@ -211,9 +236,9 @@ impl<'a> App<'a> {
         }
     }
 
-    pub fn get_term_size(&self) -> (u16, u16) {
-        return self.term_size;
-    }
+    /*
+     * Defines the boundaries of the cursor in the terminal window
+     */
     pub fn term_top_cursor_bound(&self) -> u16 {
         return 1;
     }
@@ -228,14 +253,10 @@ impl<'a> App<'a> {
         // - 2 because borders
         return self.term_size.1 - 2;
     }
-    pub fn running(&self) -> bool {
-        return self.running;
-    }
 
-    fn exit(&mut self) {
-        self.running = false;
-    }
-
+    /*
+     * Used to handle updates in the terminal size
+     */
     pub fn update_term_size(&mut self, term_height: u16, term_width: u16) {
         self.term_size = (term_height, term_width);
         // TEMP: Future should use ref to buffer instead of display_string
@@ -264,6 +285,16 @@ impl<'a> App<'a> {
         // Ensure the cursor stays in a valid location
         self.snap_cursor();
         self.slip_cursor();
+    }
+
+    /*
+     * Used to start/stop the app
+     */
+    pub fn running(&self) -> bool {
+        return self.running;
+    }
+    fn exit(&mut self) {
+        self.running = false;
     }
 
     /*
@@ -300,16 +331,16 @@ impl<'a> App<'a> {
 
     fn normal_handle_key_event(&mut self, key_event: KeyEvent) {
         // Clear any error/status messages once the user makes an input
-        self.ui_display = vec![];
+        self.msg_display = vec![];
         match key_event.code {
             KeyCode::Char('i') => self.mode = Mode::Insert,
             KeyCode::Char(':') => {
                 self.mode = Mode::Command;
-                self.ui_display = vec![':'];
+                self.msg_display = vec![':'];
             }
             KeyCode::Char('/') => {
                 self.mode = Mode::SearchInput;
-                self.ui_display = vec!['/'];
+                self.msg_display = vec!['/'];
             }
             KeyCode::Up => self.cursor_up(),
             KeyCode::Down => self.cursor_down(),
@@ -322,47 +353,47 @@ impl<'a> App<'a> {
     fn command_handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Esc => {
-                self.ui_display = vec![];
+                self.msg_display = vec![];
                 self.mode = Mode::Normal;
             }
             KeyCode::Enter => {
-                let command: String = self.ui_display.iter().collect();
+                let command: String = self.msg_display.iter().collect();
                 match command.as_str() {
                     ":w" | ":W" | ":write" => { /* TO DO */ }
                     ":q" | ":Q" | ":quit" => self.exit(),
                     ":wq" | ":WQ" => { /* TO DO */ }
-                    ":set num" | ":set nu" | ":num" | ":nu" => {}
+                    ":set number" | ":set num" | ":set nu" | ":num" | ":nu" => {}
                     _ => {
                         let error_msg = String::from("Error: Invalid Command");
-                        self.ui_display = error_msg.chars().collect();
+                        self.msg_display = error_msg.chars().collect();
                     }
                 }
                 self.mode = Mode::Normal;
             }
             KeyCode::Backspace => {
-                self.ui_display.pop();
-                if self.ui_display.len() == 0 {
+                self.msg_display.pop();
+                if self.msg_display.len() == 0 {
                     self.mode = Mode::Normal;
                 }
             }
-            KeyCode::Char(character) => self.ui_display.push(character),
+            KeyCode::Char(character) => self.msg_display.push(character),
             _ => {}
         }
     }
 
     fn insert_handle_key_event(&mut self, key_event: KeyEvent) {
         // Clear any error/status messages once the user makes an input
-        self.ui_display = vec![];
+        self.msg_display = vec![];
         match key_event.code {
             KeyCode::Esc => {
-                self.ui_display = vec![];
+                self.msg_display = vec![];
                 self.mode = Mode::Normal;
                 self.snap_cursor();
             }
-            KeyCode::Backspace => { /* TO DO */ }
-            KeyCode::Enter => { /* TO DO */ }
-            KeyCode::Tab => { /* TO DO */ }
-            KeyCode::Char(character) => { /* TO DO */ }
+            KeyCode::Backspace => self.delete_char(),
+            KeyCode::Enter => self.insert_char('\n'),
+            KeyCode::Tab => self.insert_char('\t'),
+            KeyCode::Char(character) => self.insert_char(character),
             KeyCode::Up => self.cursor_up(),
             KeyCode::Down => self.cursor_down(),
             KeyCode::Left => self.cursor_left(),
@@ -370,32 +401,74 @@ impl<'a> App<'a> {
             _ => {}
         }
     }
+    fn delete_char(&mut self) {
+        /* TO DO actually delete the character from the buffer*/
+        let file_ind = self.get_cursor_file_index(); // char index of file where character should be deleted
+        // TO DO: Make sure to pass in string ref to buffer (smth like that) where self.display_string is below to update View
+        self.display_content = string_to_lines(
+            self.display_string,
+            self.term_size.1,
+            self.first_line_num,
+            self.first_char_ind,
+        );
+        self.cursor_left();
+    }
+    fn insert_char(&mut self, c: char) {
+        /* TO DO actually insert the character into the buffer*/
+        let file_ind = self.get_cursor_file_index(); // char index of file where character should be inserted
+        // TO DO: Make sure to pass in string ref to buffer (smth like that) where self.display_string is below to update View
+        self.display_content = string_to_lines(
+            self.display_string,
+            self.term_size.1,
+            self.first_line_num,
+            self.first_char_ind,
+        );
+        self.cursor_right();
+    }
 
     fn search_input_handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Esc => {
-                self.ui_display = vec![];
+                self.msg_display = vec![];
                 self.mode = Mode::Normal;
             }
             KeyCode::Enter => {
-                // TO DO: Actually perform the search. Only transition to search mode if matches found
-                self.mode = Mode::Search
-            }
-            KeyCode::Backspace => {
-                self.ui_display.pop();
-                if self.ui_display.len() == 0 {
+                // TO DO: Actually perform the search with buffer instead of dummy_search. Only transition to search mode if matches found
+                if let Some(num_matches) = self.dummy_search() {
+                    self.search_term = Some(self.msg_display[1..].iter().collect());
+                    let mut message = num_matches.to_string();
+                    message.push_str(" matches");
+                    self.msg_display = message.chars().collect();
+                    self.mode = Mode::Search;
+                } else {
+                    self.msg_display = "Error: No matches found".chars().collect();
                     self.mode = Mode::Normal;
                 }
             }
-            KeyCode::Char(character) => self.ui_display.push(character),
+            KeyCode::Backspace => {
+                self.msg_display.pop();
+                if self.msg_display.len() == 0 {
+                    self.mode = Mode::Normal;
+                }
+            }
+            KeyCode::Char(character) => self.msg_display.push(character),
             _ => {}
+        }
+    }
+    fn dummy_search(&self) -> Option<usize> {
+        let query: String = self.msg_display[1..].iter().collect();
+        if self.display_string.contains(&query) {
+            return Some(self.display_string.matches(&query).count());
+        } else {
+            return None;
         }
     }
 
     fn search_handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Esc => {
-                self.ui_display = vec![];
+                self.search_term = None;
+                self.msg_display = vec![];
                 self.mode = Mode::Normal;
             }
             KeyCode::Char('n') => { /* TO DO*/ }
@@ -409,11 +482,13 @@ impl<'a> App<'a> {
             self.scroll_amount -= 1;
             return Ok(());
         } else {
-            // TO DO: Ask buffer to read in another line from rope, then push out a line from other end
+            // TO DO: Ask buffer to read in another line from rope to the head of buffer, and adjust scroll accordingly
+            // Then, if the last line is no longer visible in the view,
+            // push out a line from the end of buffer
+            // Make sure to run self.display_content = string_to_lines with appropriate args to update
             return Err("Error: Start of file reached");
         }
     }
-
     fn scroll_down(&mut self) -> Result<(), &str> {
         let max_scroll_amount = self.display_content.len()
             - (self.term_bottom_cursor_bound() - self.term_top_cursor_bound() + 1) as usize;
@@ -421,24 +496,25 @@ impl<'a> App<'a> {
             self.scroll_amount += 1;
             return Ok(());
         } else {
-            // TO DO: Ask buffer to read in another line from rope, then push out a line from other end
+            // TO DO: Ask buffer to read in another line from rope to the end of buffer
+            // Then, if self.first_line_num no longer matches the line num of the top visible line in the view,
+            // push out a line from the head of buffer and adjust scroll accordingly.
+            // Make sure to run self.display_content = string_to_lines with appropriate args to update
             return Err("Error: End of file reached");
         }
     }
 
     fn cursor_up(&mut self) {
+        // Check if there is room to move the cursor upwards
         if self.cursor_pos.0 > self.term_top_cursor_bound() {
+            // Move up, and adjust cursor to a viable position
             self.cursor_pos.0 -= 1;
-
-            // Snap cursor to end of line after moving down
             self.snap_cursor();
-
-            // If cursor just moved into the middle of a wide character (ex tab space) 'slip' it leftwards to valid space
             self.slip_cursor();
         } else {
-            match self.scroll_up() {
-                Ok(_) => {}
-                Err(msg) => self.ui_display = msg.chars().collect(),
+            // If at top bound, try to scroll content instead of moving cursor
+            if let Err(msg) = self.scroll_up() {
+                self.msg_display = msg.chars().collect();
             };
         }
     }
@@ -446,22 +522,20 @@ impl<'a> App<'a> {
     fn cursor_down(&mut self) {
         // Edge case: small file, big terminal. End of file was reached
         if (self.cursor_pos.0 as usize) == self.display_content.len() {
-            self.ui_display = "Error: End of file reached".chars().collect();
+            self.msg_display = "Error: End of file reached".chars().collect();
             return;
         }
 
+        // Check if there is room to move cursor downwards
         if self.cursor_pos.0 < self.term_bottom_cursor_bound() {
+            // Move down, and adjust cursor to a viable position
             self.cursor_pos.0 += 1;
-
-            // Snap cursor to end of line after moving down
             self.snap_cursor();
-
-            // If cursor just moved into the middle of a wide character (ex tab space) 'slip' it leftwards to valid space
             self.slip_cursor();
         } else {
-            match self.scroll_down() {
-                Ok(_) => {}
-                Err(msg) => self.ui_display = msg.chars().collect(),
+            // If at bottom bound, try to scroll content instead of moving cursor
+            if let Err(msg) = self.scroll_down() {
+                self.msg_display = msg.chars().collect();
             };
         }
     }
@@ -475,36 +549,33 @@ impl<'a> App<'a> {
             self.cursor_pos.1 += 1;
         }
 
-        // Allow the cursor to move to the end of the line if in insertion mode
         let mut bound = width(&line.line_content);
+        // Allow the cursor to move to the end of the line if in insertion mode
         if let Mode::Insert = self.mode {
             bound += 1;
         }
 
-        // If cursor is at the right boundary, move to the start of the next line if available
+        // If cursor is at or past the right boundary (end of the line), move to the start of the next line if available
         if self.cursor_pos.1 as u64 >= bound {
             // Edge case: small file, big terminal. End of file was reached
             if (self.get_cursor_display_row() + 1) == self.display_content.len() {
-                self.ui_display = "Error: End of file reached".chars().collect();
+                self.msg_display = "Error: End of file reached".chars().collect();
                 return;
             }
 
             // If scrolling needed, try to do so
             if self.cursor_pos.0 == self.term_bottom_cursor_bound() {
-                match self.scroll_down() {
-                    Ok(_) => {}
-                    Err(msg) => {
-                        self.ui_display = msg.chars().collect();
-                        return;
-                    }
+                if let Err(msg) = self.scroll_down() {
+                    self.msg_display = msg.chars().collect();
+                    return;
                 };
             } else {
-                // Only move up if did not scroll
+                // Only move down if did not scroll
                 self.cursor_pos.0 += 1;
             }
-            self.cursor_pos.1 = 1;
+            self.cursor_pos.1 = 1; // Move to start of next line
         } else {
-            self.cursor_pos.1 += 1;
+            self.cursor_pos.1 += 1; // Move cursor one step to the right
         }
     }
 
@@ -513,42 +584,37 @@ impl<'a> App<'a> {
         if self.cursor_pos.1 == self.term_left_cursor_bound() {
             // If scrolling needed, try to do so
             if self.cursor_pos.0 == self.term_top_cursor_bound() {
-                match self.scroll_up() {
-                    Ok(_) => {}
-                    Err(msg) => {
-                        self.ui_display = msg.chars().collect();
-                        return;
-                    }
+                if let Err(msg) = self.scroll_up() {
+                    self.msg_display = msg.chars().collect();
+                    return;
                 };
             } else {
-                // Only move down if did not scroll
+                // Only move up if did not scroll
                 self.cursor_pos.0 -= 1;
             }
-
-            // display_content is 0-indexed, cursor_pos is 1-indexed
+            // Get end of line coordinates
             let line = &self.display_content[self.get_cursor_display_row()].line_content;
-
-            // Allow the cursor to move to the end of the line if in insertion mode
             let mut bound = width(line);
+
+            // Allow the cursor to move one space further if in insertion mode
             if let Mode::Insert = self.mode {
                 bound += 1;
             }
 
-            self.cursor_pos.1 = bound as u16;
+            self.cursor_pos.1 = bound as u16; // Move to end of prev line
         } else {
-            self.cursor_pos.1 -= 1;
+            self.cursor_pos.1 -= 1; // Move cursor one step to the left
         }
-
-        // If cursor just moved into the middle of a wide character (ex tab space) 'slip' it leftwards to valid space
         self.slip_cursor();
     }
 
+    // Snap cursor to end of line after moving up/down into a shorter line of text
     fn snap_cursor(&mut self) {
-        // display_content is 0-indexed, cursor_pos is 1-indexed
+        // Get end of line coordinates
         let line = &self.display_content[self.get_cursor_display_row()].line_content;
+        let mut bound = width(line);
 
         // Allow the cursor to move to the end of the line if in insertion mode
-        let mut bound = width(line);
         if let Mode::Insert = self.mode {
             bound += 1;
         }
@@ -560,11 +626,9 @@ impl<'a> App<'a> {
         }
     }
 
+    // If cursor just moved into the middle of a wide character (ex tab space) 'slip' it leftwards to valid space
     fn slip_cursor(&mut self) {
-        // display_content is 0-indexed, cursor_pos is 1-indexed
         let invalid_cols = &self.display_content[self.get_cursor_display_row()].invalid_cols;
-
-        // If cursor just moved into the middle of a wide character (ex tab space) 'slip' it leftwards to valid space
         while invalid_cols.contains(&self.cursor_pos.1) {
             self.cursor_pos.1 -= 1;
         }

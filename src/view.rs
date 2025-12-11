@@ -5,7 +5,7 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Position};
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::symbols::border;
-use ratatui::text::{Line, Text};
+use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, Paragraph};
 use std::cmp::max;
 use std::io::stdout;
@@ -16,8 +16,9 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
 
     let file_name = app.get_filename();
     let display_lines = app.get_content();
-    let app_mode = app.get_mode();
-    let ui_message = app.get_ui_display();
+    let app_mode = app.get_mode_text();
+    let search_term = app.get_search_term();
+    let ui_message = app.get_msg_display();
     let curr_row = display_lines[(scroll_amount + cursor_pos.0) as usize - 1].line_num;
     let curr_col = app.get_cursor_inline_index();
 
@@ -40,8 +41,27 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     let title = Line::from(file_name.bold());
     let content_block = Block::bordered().title(title).border_set(border::THICK);
     let mut display_content: Vec<Line> = Vec::new();
-    for line in display_lines.iter() {
-        display_content.push(Line::styled(&line.line_content, Style::default()));
+    for line in display_lines
+        .iter()
+        .map(|display_line| &display_line.line_content)
+    {
+        if let Some(keyword) = search_term
+            && line.contains(keyword)
+        {
+            // There was a positive search result, highlight possible matches
+            let mut substrings = line.split(keyword);
+            let mut search_line = vec![Span::raw(substrings.next().unwrap())]; // The first elem of this iterator shouldn't be empty
+            for substring in substrings {
+                search_line.push(Span::styled(
+                    keyword,
+                    Style::default().fg(Color::White).bg(Color::Cyan),
+                ));
+                search_line.push(Span::raw(substring));
+            }
+            display_content.push(Line::from(search_line));
+        } else {
+            display_content.push(Line::styled(line, Style::default()));
+        }
     }
     let display_content: Text = display_content.into();
 
@@ -57,6 +77,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     frame.render_widget(Paragraph::new(cursor_pos_content), bottom_layout[0]);
 
     // Command Window
+    // First line describes mode and important keys
     let mode_text = Line::styled(
         app_mode,
         Style::default()
@@ -64,7 +85,9 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
             .add_modifier(Modifier::BOLD),
     )
     .centered();
+    // Second line contains user input, or messages to user
     let ui_text: Line;
+    // Highlight error messages in red
     if ui_message.contains("Error") {
         ui_text =
             Line::styled(ui_message, Style::default().fg(Color::White).bg(Color::Red)).centered();
