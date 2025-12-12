@@ -1,14 +1,48 @@
-use crate::App;
+use crate::{App, controller::Mode};
 use count_digits::{self, CountDigits};
 use crossterm::{cursor::SetCursorStyle, execute};
-use ratatui::Frame;
-use ratatui::layout::{Constraint, Direction, Layout, Position};
-use ratatui::style::{Color, Modifier, Style, Stylize};
-use ratatui::symbols::border;
-use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Block, Borders, Paragraph};
+use ratatui::{
+    Frame,
+    layout::{Constraint, Direction, Flex, Layout, Position},
+    prelude::Rect,
+    style::{Color, Modifier, Style, Stylize},
+    symbols::border,
+    text::{Line, Span, Text},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+};
 use std::cmp::max;
 use std::io::stdout;
+
+const LEFT_HELP_TEXT: &str = "Normal Mode:
+Move the cursor with arrow keys
+[i] to start editing text in Insertion Mode
+[:] to start typing in Command Mode
+[/] to start a query in Search Input Mode
+
+Command Mode:
+[Esc] to cancel and return to Normal Mode
+[Enter] to submit the command
+Commands:
+:q => Quit editing
+:w => Write to file
+:wq => Write to file, then quit
+:num => Toggle line numbers";
+
+const RIGHT_HELP_TEXT: &str = "Insertion Mode:
+Move the cursor with arrow keys
+Type to insert characters at the cursor location
+[Backspace] to delete characters at the cursor location
+[Esc] to return to Normal Mode
+
+Search Input Mode:
+[Esc] to cancel and return to Normal Mode
+[Enter] to submit the search query and enter Search Mode
+
+Search Mode:
+[Esc] to cancel and return to Normal Mode
+[n] to jump to the next match
+[p] to jump to the previous match
+";
 
 pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     let file_name = app.get_filename();
@@ -16,9 +50,10 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     let show_line_num = app.get_show_line_num();
     let search_term = app.get_search_term();
 
-    let app_mode = app.get_mode_text();
+    let mode_text = app.get_mode_text();
     let ui_message = app.get_msg_display();
 
+    let app_mode = app.get_app_mode();
     let scroll_amount = app.get_scroll_amount();
     let cursor_pos = app.get_cursor_pos();
     let curr_row = display_lines[(scroll_amount + cursor_pos.0) as usize - 1].line_num;
@@ -92,7 +127,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     // Command Window
     // First line describes mode and important keys
     let mode_text = Line::styled(
-        app_mode,
+        mode_text,
         Style::default()
             .fg(Color::Cyan)
             .add_modifier(Modifier::BOLD),
@@ -111,11 +146,43 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     let ui_block = Block::new().borders(Borders::LEFT);
     frame.render_widget(Paragraph::new(ui_content).block(ui_block), bottom_layout[1]);
 
+    // Render Help pop-up if in Help mode
+    if let Mode::Help = app_mode {
+        let help_popup_block = Block::bordered()
+            .title("Help Menu")
+            .border_set(border::THICK)
+            .style(Style::default().bg(Color::Blue));
+        let area = frame.area();
+        let area = popup_area(area, 90, 75);
+        frame.render_widget(Clear, area);
+        frame.render_widget(help_popup_block, area);
+
+        let help_popup_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .margin(1)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(area);
+
+        let left_help_text = Paragraph::new(LEFT_HELP_TEXT).wrap(Wrap { trim: false });
+        let right_help_text = Paragraph::new(RIGHT_HELP_TEXT).wrap(Wrap { trim: false });
+        frame.render_widget(left_help_text, help_popup_chunks[0]);
+        frame.render_widget(right_help_text, help_popup_chunks[1]);
+    }
+
     // Render cursor
-    if app_mode.contains("Insertion") {
+    if let Mode::Insert = app_mode {
         execute!(stdout(), SetCursorStyle::BlinkingBar).unwrap();
     } else {
         execute!(stdout(), SetCursorStyle::BlinkingBlock).unwrap();
     }
     frame.set_cursor_position(Position::new(cursor_pos.1, cursor_pos.0));
+}
+
+// helper function to create a centered rect using up certain percentage of the available rect `r`
+fn popup_area(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
+    let vertical = Layout::vertical([Constraint::Percentage(percent_y)]).flex(Flex::Center);
+    let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(Flex::Center);
+    let [area] = vertical.areas(area);
+    let [area] = horizontal.areas(area);
+    area
 }

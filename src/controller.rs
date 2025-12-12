@@ -14,6 +14,7 @@ pub enum Mode {
     Search,
     Insert,
     Minimized, //Used to prevent cursor out of bounds crash when terminal is shrunk to <=4 lines tall
+    Help,      // Used to display the help screen
 }
 
 fn string_to_lines(
@@ -187,6 +188,9 @@ impl<'a> App<'a> {
     pub fn get_first_char_ind(&self) -> usize {
         return self.first_char_ind;
     }
+    pub fn get_app_mode(&self) -> &Mode {
+        return &self.mode;
+    }
     pub fn get_msg_display(&self) -> String {
         return self.msg_display.iter().collect();
     }
@@ -211,12 +215,13 @@ impl<'a> App<'a> {
      */
     pub fn get_mode_text(&self) -> &str {
         match &self.mode {
-            Mode::Normal => return "Normal Mode [i]=>Insert [:]=>Command [/]=>Search",
+            Mode::Normal => return "Normal Mode [h]=>Help [i]=>Insert [:]=>Command [/]=>Search",
             Mode::Command => return "Command Mode [ENTER]=>Submit [ESC]=>Exit",
             Mode::SearchInput => return "Search Mode [ENTER]=>Submit [ESC]=>Exit",
             Mode::Search => return "Search Mode [n]=>Next [p]=>Prev [ESC]=>Exit",
             Mode::Insert => return "Insertion Mode [ESC]=>Exit",
             Mode::Minimized => return "Please Enlarge Terminal Window",
+            Mode::Help => return "Help Page [ESC]=>Exit",
         }
     }
 
@@ -377,14 +382,24 @@ impl<'a> App<'a> {
             Mode::SearchInput => self.search_input_handle_key_event(key_event),
             Mode::Search => self.search_handle_key_event(key_event),
             Mode::Minimized => {}
+            Mode::Help => self.help_handle_key_event(key_event),
         }
+    }
+
+    fn help_handle_key_event(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Esc => self.mode = Mode::Normal,
+            KeyCode::Up => {}   //self.cursor_up(),
+            KeyCode::Down => {} //self.cursor_down(),
+            _ => {}
+        };
     }
 
     fn normal_handle_key_event(&mut self, key_event: KeyEvent) {
         // Clear any error/status messages once the user makes an input
         self.msg_display = vec![];
         match key_event.code {
-            KeyCode::Char('i') => self.mode = Mode::Insert,
+            KeyCode::Char('i') | KeyCode::Char('I') => self.mode = Mode::Insert,
             KeyCode::Char(':') => {
                 self.mode = Mode::Command;
                 self.msg_display = vec![':'];
@@ -393,6 +408,7 @@ impl<'a> App<'a> {
                 self.mode = Mode::SearchInput;
                 self.msg_display = vec!['/'];
             }
+            KeyCode::Char('h') | KeyCode::Char('H') => self.mode = Mode::Help,
             KeyCode::Up => self.cursor_up(),
             KeyCode::Down => self.cursor_down(),
             KeyCode::Left => self.cursor_left(),
@@ -537,8 +553,9 @@ impl<'a> App<'a> {
                 self.msg_display = vec![];
                 self.mode = Mode::Normal;
             }
-            KeyCode::Char('n') => { /* TO DO*/ }
-            KeyCode::Char('p') => { /*TO DO*/ }
+            KeyCode::Char('n') => { /*TO DO Scroll to line containing next match if it exists*/ }
+            KeyCode::Char('p') => { /*TO DO Scroll to line containing previous match if it exists*/
+            }
             _ => {}
         }
     }
