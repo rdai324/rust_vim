@@ -11,14 +11,16 @@ use std::cmp::max;
 use std::io::stdout;
 
 pub fn draw_ui(frame: &mut Frame, app: &mut App) {
-    let scroll_amount = app.get_scroll_amount();
-    let cursor_pos = app.get_cursor_pos();
-
     let file_name = app.get_filename();
     let display_lines = app.get_content();
-    let app_mode = app.get_mode_text();
+    let show_line_num = app.get_show_line_num();
     let search_term = app.get_search_term();
+
+    let app_mode = app.get_mode_text();
     let ui_message = app.get_msg_display();
+
+    let scroll_amount = app.get_scroll_amount();
+    let cursor_pos = app.get_cursor_pos();
     let curr_row = display_lines[(scroll_amount + cursor_pos.0) as usize - 1].line_num;
     let curr_col = app.get_cursor_inline_index();
 
@@ -45,23 +47,34 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
         .iter()
         .map(|display_line| &display_line.line_content)
     {
+        let mut display_line = vec![];
+
+        let mut line_content_index = 0;
+        if show_line_num {
+            line_content_index = line.find('|').unwrap();
+            display_line.push(Span::styled(
+                &line[..line_content_index],
+                Style::default().fg(Color::Yellow),
+            ));
+        }
+
         if let Some(keyword) = search_term
-            && line.contains(keyword)
+            && line[line_content_index..].contains(keyword)
         {
             // There was a positive search result, highlight possible matches
-            let mut substrings = line.split(keyword);
-            let mut search_line = vec![Span::raw(substrings.next().unwrap())]; // The first elem of this iterator shouldn't be empty
+            let mut substrings = line[line_content_index..].split(keyword);
+            display_line.push(Span::raw(substrings.next().unwrap())); // The first elem of this iterator shouldn't be empty
             for substring in substrings {
-                search_line.push(Span::styled(
+                display_line.push(Span::styled(
                     keyword,
                     Style::default().fg(Color::White).bg(Color::Cyan),
                 ));
-                search_line.push(Span::raw(substring));
+                display_line.push(Span::raw(substring));
             }
-            display_content.push(Line::from(search_line));
         } else {
-            display_content.push(Line::styled(line, Style::default()));
+            display_line.push(Span::styled(&line[line_content_index..], Style::default()));
         }
+        display_content.push(display_line.into());
     }
     let display_content: Text = display_content.into();
 

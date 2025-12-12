@@ -202,6 +202,9 @@ impl<'a> App<'a> {
     pub fn get_search_term(&self) -> &Option<String> {
         return &self.search_term;
     }
+    pub fn get_show_line_num(&self) -> bool {
+        return self.show_line_nums;
+    }
 
     /*
      * Used by View to show the current mode, and important inputs
