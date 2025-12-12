@@ -1,3 +1,4 @@
+use crate::view::MAX_HELP_SCROLL;
 use count_digits::CountDigits;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use std::cmp;
@@ -14,6 +15,7 @@ pub enum Mode {
     Search,
     Insert,
     Minimized, //Used to prevent cursor out of bounds crash when terminal is shrunk to <=4 lines tall
+    Help,      // Used to display the help screen
 }
 
 fn string_to_lines(
@@ -139,6 +141,7 @@ pub struct App<'a> {
     first_line_num: usize, // What is the line number of the first line loaded? Used for line number display
     first_char_ind: usize, // What is the infile character index of the first character loaded? Used for cursor indexing
     scroll_amount: u16,    // How far did we scroll down display_content?
+    scroll_help_amount: u16, // How far to scroll help popup
     mode: Mode,
     show_line_nums: bool,
     msg_display: Vec<char>, // Input taken from user for commands or searching
@@ -162,6 +165,7 @@ impl<'a> App<'a> {
             first_line_num: 1,
             first_char_ind: 0,
             scroll_amount: 0,
+            scroll_help_amount: 0,
             mode: Mode::Normal,
             show_line_nums: false,
             msg_display: vec![],
@@ -187,6 +191,9 @@ impl<'a> App<'a> {
     pub fn get_first_char_ind(&self) -> usize {
         return self.first_char_ind;
     }
+    pub fn get_app_mode(&self) -> &Mode {
+        return &self.mode;
+    }
     pub fn get_msg_display(&self) -> String {
         return self.msg_display.iter().collect();
     }
@@ -195,6 +202,9 @@ impl<'a> App<'a> {
     }
     pub fn get_scroll_amount(&self) -> u16 {
         return self.scroll_amount;
+    }
+    pub fn get_scroll_help_amount(&self) -> u16 {
+        return self.scroll_help_amount;
     }
     pub fn get_term_size(&self) -> (u16, u16) {
         return self.term_size;
@@ -211,12 +221,13 @@ impl<'a> App<'a> {
      */
     pub fn get_mode_text(&self) -> &str {
         match &self.mode {
-            Mode::Normal => return "Normal Mode [i]=>Insert [:]=>Command [/]=>Search",
+            Mode::Normal => return "Normal Mode [h]=>Help [i]=>Insert [:]=>Command [/]=>Search",
             Mode::Command => return "Command Mode [ENTER]=>Submit [ESC]=>Exit",
             Mode::SearchInput => return "Search Mode [ENTER]=>Submit [ESC]=>Exit",
             Mode::Search => return "Search Mode [n]=>Next [p]=>Prev [ESC]=>Exit",
             Mode::Insert => return "Insertion Mode [ESC]=>Exit",
             Mode::Minimized => return "Please Enlarge Terminal Window",
+            Mode::Help => return "Help Page [ESC]=>Exit [^][v] to Scroll Help Text",
         }
     }
 
@@ -377,14 +388,27 @@ impl<'a> App<'a> {
             Mode::SearchInput => self.search_input_handle_key_event(key_event),
             Mode::Search => self.search_handle_key_event(key_event),
             Mode::Minimized => {}
+            Mode::Help => self.help_handle_key_event(key_event),
         }
+    }
+
+    fn help_handle_key_event(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Esc => {
+                self.mode = Mode::Normal;
+                self.scroll_help_amount = 0;
+            }
+            KeyCode::Up | KeyCode::Char('^') => self.scroll_help_up(),
+            KeyCode::Down | KeyCode::Char('v') | KeyCode::Char('V') => self.scroll_help_down(),
+            _ => {}
+        };
     }
 
     fn normal_handle_key_event(&mut self, key_event: KeyEvent) {
         // Clear any error/status messages once the user makes an input
         self.msg_display = vec![];
         match key_event.code {
-            KeyCode::Char('i') => self.mode = Mode::Insert,
+            KeyCode::Char('i') | KeyCode::Char('I') => self.mode = Mode::Insert,
             KeyCode::Char(':') => {
                 self.mode = Mode::Command;
                 self.msg_display = vec![':'];
@@ -393,6 +417,7 @@ impl<'a> App<'a> {
                 self.mode = Mode::SearchInput;
                 self.msg_display = vec!['/'];
             }
+            KeyCode::Char('h') | KeyCode::Char('H') => self.mode = Mode::Help,
             KeyCode::Up => self.cursor_up(),
             KeyCode::Down => self.cursor_down(),
             KeyCode::Left => self.cursor_left(),
@@ -537,12 +562,21 @@ impl<'a> App<'a> {
                 self.msg_display = vec![];
                 self.mode = Mode::Normal;
             }
-            KeyCode::Char('n') => { /* TO DO*/ }
-            KeyCode::Char('p') => { /*TO DO*/ }
+            KeyCode::Char('n') => { /*TO DO Scroll to line containing next match if it exists*/ }
+            KeyCode::Char('p') => { /*TO DO Scroll to line containing previous match if it exists*/
+            }
             _ => {}
         }
     }
 
+    fn scroll_help_up(&mut self) {
+        if self.scroll_help_amount > 0 {
+            self.scroll_help_amount -= 1;
+        }
+    }
+    fn scroll_help_down(&mut self) {
+        self.scroll_help_amount = cmp::min(MAX_HELP_SCROLL, self.scroll_help_amount + 1);
+    }
     fn scroll_up(&mut self) -> Result<(), &str> {
         if self.scroll_amount > 0 {
             self.scroll_amount -= 1;
