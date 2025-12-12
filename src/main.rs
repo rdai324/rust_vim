@@ -32,7 +32,7 @@ fn main() -> io::Result<()> {
 
     let mut naive_buffer = match fs::read_to_string(&opts.file_name) {
         Ok(text) => text,
-        Err(ref e) if e.kind() == io::ErrorKind::NotFound => String::from(" "), // File name not found, so treat it as a new file
+        Err(ref e) if e.kind() == io::ErrorKind::NotFound => String::from(""), // File name not found, so treat it as a new file
         Err(error) => panic!("{error}"),
     };
 

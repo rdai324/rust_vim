@@ -25,6 +25,9 @@ fn string_to_lines(
     first_char_ind: usize,
     show_lines: bool,
 ) -> Vec<DisplayLine> {
+    if string.len() == 0 {
+        return vec![DisplayLine::new(first_line_num, first_char_ind, 0)];
+    }
     let chars = string.chars();
     let max_line_len = term_width - 2; // to accomodate the two borders
     let mut lines: Vec<DisplayLine> = Vec::new();
