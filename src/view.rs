@@ -41,8 +41,9 @@ Search Input Mode:
 Search Mode:
 [Esc] to cancel and return to Normal Mode
 [n] to jump to the next match
-[p] to jump to the previous match
-";
+[p] to jump to the previous match";
+
+pub const MAX_HELP_SCROLL: u16 = 14;
 
 pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     let file_name = app.get_filename();
@@ -55,6 +56,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
 
     let app_mode = app.get_app_mode();
     let scroll_amount = app.get_scroll_amount();
+    let help_scroll = app.get_scroll_help_amount();
     let cursor_pos = app.get_cursor_pos();
     let curr_row = display_lines[(scroll_amount + cursor_pos.0) as usize - 1].line_num;
     let curr_col = app.get_cursor_inline_index();
@@ -163,8 +165,12 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(area);
 
-        let left_help_text = Paragraph::new(LEFT_HELP_TEXT).wrap(Wrap { trim: false });
-        let right_help_text = Paragraph::new(RIGHT_HELP_TEXT).wrap(Wrap { trim: false });
+        let left_help_text = Paragraph::new(LEFT_HELP_TEXT)
+            .wrap(Wrap { trim: false })
+            .scroll((help_scroll, 0));
+        let right_help_text = Paragraph::new(RIGHT_HELP_TEXT)
+            .wrap(Wrap { trim: false })
+            .scroll((help_scroll, 0));
         frame.render_widget(left_help_text, help_popup_chunks[0]);
         frame.render_widget(right_help_text, help_popup_chunks[1]);
     }

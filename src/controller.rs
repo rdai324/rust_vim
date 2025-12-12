@@ -1,3 +1,4 @@
+use crate::view::MAX_HELP_SCROLL;
 use count_digits::CountDigits;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use std::cmp;
@@ -140,6 +141,7 @@ pub struct App<'a> {
     first_line_num: usize, // What is the line number of the first line loaded? Used for line number display
     first_char_ind: usize, // What is the infile character index of the first character loaded? Used for cursor indexing
     scroll_amount: u16,    // How far did we scroll down display_content?
+    scroll_help_amount: u16, // How far to scroll help popup
     mode: Mode,
     show_line_nums: bool,
     msg_display: Vec<char>, // Input taken from user for commands or searching
@@ -163,6 +165,7 @@ impl<'a> App<'a> {
             first_line_num: 1,
             first_char_ind: 0,
             scroll_amount: 0,
+            scroll_help_amount: 0,
             mode: Mode::Normal,
             show_line_nums: false,
             msg_display: vec![],
@@ -200,6 +203,9 @@ impl<'a> App<'a> {
     pub fn get_scroll_amount(&self) -> u16 {
         return self.scroll_amount;
     }
+    pub fn get_scroll_help_amount(&self) -> u16 {
+        return self.scroll_help_amount;
+    }
     pub fn get_term_size(&self) -> (u16, u16) {
         return self.term_size;
     }
@@ -221,7 +227,7 @@ impl<'a> App<'a> {
             Mode::Search => return "Search Mode [n]=>Next [p]=>Prev [ESC]=>Exit",
             Mode::Insert => return "Insertion Mode [ESC]=>Exit",
             Mode::Minimized => return "Please Enlarge Terminal Window",
-            Mode::Help => return "Help Page [ESC]=>Exit",
+            Mode::Help => return "Help Page [ESC]=>Exit [^][v] to Scroll Help Text",
         }
     }
 
@@ -388,9 +394,12 @@ impl<'a> App<'a> {
 
     fn help_handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
-            KeyCode::Esc => self.mode = Mode::Normal,
-            KeyCode::Up => {}   //self.cursor_up(),
-            KeyCode::Down => {} //self.cursor_down(),
+            KeyCode::Esc => {
+                self.mode = Mode::Normal;
+                self.scroll_help_amount = 0;
+            }
+            KeyCode::Up | KeyCode::Char('^') => self.scroll_help_up(),
+            KeyCode::Down | KeyCode::Char('v') | KeyCode::Char('V') => self.scroll_help_down(),
             _ => {}
         };
     }
@@ -560,6 +569,14 @@ impl<'a> App<'a> {
         }
     }
 
+    fn scroll_help_up(&mut self) {
+        if self.scroll_help_amount > 0 {
+            self.scroll_help_amount -= 1;
+        }
+    }
+    fn scroll_help_down(&mut self) {
+        self.scroll_help_amount = cmp::min(MAX_HELP_SCROLL, self.scroll_help_amount + 1);
+    }
     fn scroll_up(&mut self) -> Result<(), &str> {
         if self.scroll_amount > 0 {
             self.scroll_amount -= 1;
