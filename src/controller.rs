@@ -1,3 +1,4 @@
+use count_digits::CountDigits;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use std::cmp;
 use std::io;
@@ -20,6 +21,7 @@ fn string_to_lines(
     term_width: u16,
     first_line_num: usize,
     first_char_ind: usize,
+    show_lines: bool,
 ) -> Vec<DisplayLine> {
     let chars = string.chars();
     let max_line_len = term_width - 2; // to accomodate the two borders
@@ -27,6 +29,11 @@ fn string_to_lines(
     let mut line = DisplayLine::new(first_line_num, first_char_ind, 0);
     let mut num_chars = 0; // Used for calculating file indexing
     let mut total_char_width = 0; // Used to track how many characters can fit on a line
+    if show_lines {
+        line.line_content = first_line_num.to_string();
+        line.line_content.push('|');
+        total_char_width = first_line_num.count_digits() as u16 + 1;
+    }
     for character in chars {
         // if character is a newline, stop building line and append it to lines
         if character == '\n' {
@@ -39,6 +46,11 @@ fn string_to_lines(
             );
             num_chars = 0;
             total_char_width = 0;
+            if show_lines {
+                line.line_content = line.line_num.to_string();
+                line.line_content.push('|');
+                total_char_width = line.line_num.count_digits() as u16 + 1;
+            }
             continue;
         }
 
@@ -62,6 +74,11 @@ fn string_to_lines(
             );
             num_chars = 0;
             total_char_width = 0;
+            if show_lines {
+                line.line_content = line.line_num.to_string();
+                line.line_content.push('|');
+                total_char_width = line.line_num.count_digits() as u16 + 1;
+            }
         }
 
         // Add character to line to be rendered
@@ -123,6 +140,7 @@ pub struct App<'a> {
     first_char_ind: usize, // What is the infile character index of the first character loaded? Used for cursor indexing
     scroll_amount: u16,    // How far did we scroll down display_content?
     mode: Mode,
+    show_line_nums: bool,
     msg_display: Vec<char>, // Input taken from user for commands or searching
     search_term: Option<String>, // What is being searched for in search mode. Only assigned on successful match for View highlighting
     cursor_pos: (u16, u16), // cursor position in terminal. (y, x), or (row, col), with 1,1 being the top-left corner (1 not 0 due to border)
@@ -140,11 +158,12 @@ impl<'a> App<'a> {
         Self {
             filename,
             display_string,
-            display_content: string_to_lines(display_string, term_width, 1, 0),
+            display_content: string_to_lines(display_string, term_width, 1, 0, false),
             first_line_num: 1,
             first_char_ind: 0,
             scroll_amount: 0,
             mode: Mode::Normal,
+            show_line_nums: false,
             msg_display: vec![],
             search_term: None,
             cursor_pos: (1, 1),
@@ -209,17 +228,23 @@ impl<'a> App<'a> {
      * Used to get which column of the file line the cursor is currently located at
      */
     pub fn get_cursor_inline_index(&self) -> usize {
+        // Get the number of non-character columns in the current line
         let line = &self.display_content[self.get_cursor_display_row()];
         let invalid_cols = &line.invalid_cols;
         let num_skipped_cols = invalid_cols
             .iter()
             .filter(|col| col < &&self.cursor_pos.1)
             .count();
+
+        // Sum the inline index of the displayed line the cursor is on, with the cursor position, and subtract non-char columns
+        let mut index = &line.inline_index + (self.cursor_pos.1 as usize) - num_skipped_cols;
         if let Mode::Insert = self.mode {
-            return &line.inline_index + (self.cursor_pos.1 as usize) - num_skipped_cols - 1;
-        } else {
-            return &line.inline_index + (self.cursor_pos.1 as usize) - num_skipped_cols;
+            index -= 1; // Insertion mode has a thinner cursor that can move into 0 indexing
         }
+        if self.show_line_nums {
+            index -= (line.line_num.count_digits() as usize + 1); // subtract the line number characters
+        }
+        return index;
     }
 
     /*
@@ -250,6 +275,12 @@ impl<'a> App<'a> {
         return self.term_size.0 - 4;
     }
     pub fn term_left_cursor_bound(&self) -> u16 {
+        if self.show_line_nums {
+            return self.display_content[self.get_cursor_display_row()]
+                .line_num
+                .count_digits() as u16
+                + 2;
+        }
         return 1;
     }
     pub fn term_right_cursor_bound(&self) -> u16 {
@@ -274,12 +305,13 @@ impl<'a> App<'a> {
             }
         }
 
-        // TEMP: Future should use ref to buffer instead of display_string
+        // TO DO: Future should use ref to buffer instead of display_string
         self.display_content = string_to_lines(
             self.display_string,
             term_width,
             self.first_line_num,
             self.first_char_ind,
+            self.show_line_nums,
         );
 
         // Update cursor position if terminal size shrunk
@@ -378,7 +410,19 @@ impl<'a> App<'a> {
                     ":w" | ":W" | ":write" => { /* TO DO */ }
                     ":q" | ":Q" | ":quit" => self.exit(),
                     ":wq" | ":WQ" => { /* TO DO */ }
-                    ":set number" | ":set num" | ":set nu" | ":num" | ":nu" => {}
+                    ":set number" | ":set num" | ":set nu" | ":num" | ":nu" => {
+                        self.show_line_nums = !self.show_line_nums;
+                        // TO DO: Make sure to pass in string ref to buffer (smth like that) where self.display_string is below to update View
+                        self.display_content = string_to_lines(
+                            self.display_string,
+                            self.term_size.1,
+                            self.first_line_num,
+                            self.first_char_ind,
+                            self.show_line_nums,
+                        );
+                        self.slip_cursor(); // mainly used when turning on show_line_nums to stay out of line num region
+                        self.snap_cursor(); // mainly used when turning off show_line_nums to snap to end of short lines
+                    }
                     _ => {
                         let error_msg = String::from("Error: Invalid Command");
                         self.msg_display = error_msg.chars().collect();
@@ -426,6 +470,7 @@ impl<'a> App<'a> {
             self.term_size.1,
             self.first_line_num,
             self.first_char_ind,
+            self.show_line_nums,
         );
         self.cursor_left();
     }
@@ -438,6 +483,7 @@ impl<'a> App<'a> {
             self.term_size.1,
             self.first_line_num,
             self.first_char_ind,
+            self.show_line_nums,
         );
         self.cursor_right();
     }
@@ -589,7 +635,7 @@ impl<'a> App<'a> {
                 // Only move down if did not scroll
                 self.cursor_pos.0 += 1;
             }
-            self.cursor_pos.1 = 1; // Move to start of next line
+            self.cursor_pos.1 = self.term_left_cursor_bound(); // Move to start of next line
         } else {
             self.cursor_pos.1 += 1; // Move cursor one step to the right
         }
@@ -643,10 +689,16 @@ impl<'a> App<'a> {
     }
 
     // If cursor just moved into the middle of a wide character (ex tab space) 'slip' it leftwards to valid space
+    // Also used to keep the cursor out of the line numbers
     fn slip_cursor(&mut self) {
         let invalid_cols = &self.display_content[self.get_cursor_display_row()].invalid_cols;
         while invalid_cols.contains(&self.cursor_pos.1) {
             self.cursor_pos.1 -= 1;
+        }
+
+        // Ensure cursor shifts out of the line number region
+        while self.cursor_pos.1 < self.term_left_cursor_bound() {
+            self.cursor_pos.1 += 1;
         }
     }
 }
