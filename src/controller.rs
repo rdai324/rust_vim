@@ -425,6 +425,7 @@ impl<'a> App<'a> {
                         );
                         self.slip_cursor(); // mainly used when turning on show_line_nums to stay out of line num region
                         self.snap_cursor(); // mainly used when turning off show_line_nums to snap to end of short lines
+                        self.msg_display = vec![];
                     }
                     _ => {
                         let error_msg = String::from("Error: Invalid Command");
