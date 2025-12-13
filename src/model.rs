@@ -133,19 +133,21 @@ impl EditorModel {
         }
     }
 
-    pub fn run_search(&mut self) {
+    pub fn run_search(&mut self) -> Option<usize> {
+        let mut num_matches = 0;
         self.search_matches.clear();
         if self.search_query.is_empty() {
-            return;
+            return None;
         }
         let re = Regex::new(&self.search_query).unwrap();
         let lines = self.rope.len_lines();
         for y in 0..lines {
             let line = self.rope.line(y).to_string();
             for mat in re.find_iter(&line) {
-                self.search_matches.push((y, mat.start()));
+                num_matches += 1;
             }
         }
+        return Some(num_matches);
     }
 
     pub fn jump_next_match(&mut self) {
