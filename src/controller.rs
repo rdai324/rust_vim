@@ -1,10 +1,10 @@
-use crate::view::MAX_HELP_SCROLL;
 use crate::model::{self, EditorModel};
+use crate::view::MAX_HELP_SCROLL;
 use count_digits::CountDigits;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use std::cmp;
-use std::io;
 use std::fs;
+use std::io;
 use unicode_display_width::width;
 
 const TAB_SIZE: u16 = 4;
@@ -45,7 +45,7 @@ fn string_to_lines(
             let last_line = &lines[lines.len() - 1];
             line = DisplayLine::new(
                 last_line.line_num + 1,
-                last_line.infile_index + num_chars,
+                last_line.infile_index + num_chars + 1,
                 0,
             );
             num_chars = 0;
@@ -434,29 +434,27 @@ impl<'a> App<'a> {
             KeyCode::Enter => {
                 let command: String = self.msg_display.iter().collect();
                 match command.as_str() {
-                    ":w" | ":write" => {
-                        match self.model.save() {
-                            Ok(_) => {
-                                self.msg_display = "Wrote file".chars().collect();
-                            }
-                            Err(e) => {
-                                self.msg_display =
-                                    format!("Error: could not write file: {}", e).chars().collect();
-                            }
+                    ":w" | ":write" => match self.model.save() {
+                        Ok(_) => {
+                            self.msg_display = "Wrote file".chars().collect();
                         }
-                    }
+                        Err(e) => {
+                            self.msg_display = format!("Error: could not write file: {}", e)
+                                .chars()
+                                .collect();
+                        }
+                    },
                     ":q" | ":quit" => self.exit(),
-                    ":wq" => {
-                        match self.model.save() {
-                            Ok(_) => {
-                                self.exit();
-                            }
-                            Err(e) => {
-                                self.msg_display =
-                                    format!("Error: could not write file: {}", e).chars().collect();
-                            }
+                    ":wq" => match self.model.save() {
+                        Ok(_) => {
+                            self.exit();
                         }
-                    }
+                        Err(e) => {
+                            self.msg_display = format!("Error: could not write file: {}", e)
+                                .chars()
+                                .collect();
+                        }
+                    },
                     ":set number" | ":set num" | ":set nu" | ":num" | ":nu" => {
                         self.show_line_nums = !self.show_line_nums;
                         // TO DO: Make sure to pass in string ref to buffer (smth like that) where self.display_string is below to update View
