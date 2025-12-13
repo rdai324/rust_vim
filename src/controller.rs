@@ -4,6 +4,7 @@ use count_digits::CountDigits;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use std::cmp;
 use std::io;
+use std::fs;
 use unicode_display_width::width;
 
 const TAB_SIZE: u16 = 4;
@@ -433,9 +434,29 @@ impl<'a> App<'a> {
             KeyCode::Enter => {
                 let command: String = self.msg_display.iter().collect();
                 match command.as_str() {
-                    ":w" | ":W" | ":write" => { /* TO DO */ }
-                    ":q" | ":Q" | ":quit" => self.exit(),
-                    ":wq" | ":WQ" => { /* TO DO */ }
+                    ":w" | ":write" => {
+                        match self.model.save() {
+                            Ok(_) => {
+                                self.msg_display = "Wrote file".chars().collect();
+                            }
+                            Err(e) => {
+                                self.msg_display =
+                                    format!("Error: could not write file: {}", e).chars().collect();
+                            }
+                        }
+                    }
+                    ":q" | ":quit" => self.exit(),
+                    ":wq" => {
+                        match self.model.save() {
+                            Ok(_) => {
+                                self.exit();
+                            }
+                            Err(e) => {
+                                self.msg_display =
+                                    format!("Error: could not write file: {}", e).chars().collect();
+                            }
+                        }
+                    }
                     ":set number" | ":set num" | ":set nu" | ":num" | ":nu" => {
                         self.show_line_nums = !self.show_line_nums;
                         // TO DO: Make sure to pass in string ref to buffer (smth like that) where self.display_string is below to update View

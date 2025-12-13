@@ -4,6 +4,8 @@ use ropey::Rope;
 use std::cmp;
 use std::fs::File;
 use std::io::BufReader;
+use std::io;
+use std::fs;
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Mode {
@@ -160,5 +162,9 @@ impl EditorModel {
         let (y, x) = self.search_matches[0];
         self.cursor_y = y;
         self.cursor_x = x;
+    }
+
+    pub fn save(&self) -> io::Result<()> {
+        fs::write(&self.file_name, self.rope.to_string())
     }
 }
