@@ -1,10 +1,10 @@
-use crate::view::MAX_HELP_SCROLL;
 use crate::model::{self, EditorModel};
+use crate::view::MAX_HELP_SCROLL;
 use count_digits::CountDigits;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use std::cmp;
-use std::io;
 use std::fs;
+use std::io;
 use unicode_display_width::width;
 
 const TAB_SIZE: u16 = 4;
@@ -45,7 +45,7 @@ fn string_to_lines(
             let last_line = &lines[lines.len() - 1];
             line = DisplayLine::new(
                 last_line.line_num + 1,
-                last_line.infile_index + num_chars,
+                last_line.infile_index + num_chars + 1,
                 0,
             );
             num_chars = 0;
@@ -434,29 +434,27 @@ impl<'a> App<'a> {
             KeyCode::Enter => {
                 let command: String = self.msg_display.iter().collect();
                 match command.as_str() {
-                    ":w" | ":write" => {
-                        match self.model.save() {
-                            Ok(_) => {
-                                self.msg_display = "Wrote file".chars().collect();
-                            }
-                            Err(e) => {
-                                self.msg_display =
-                                    format!("Error: could not write file: {}", e).chars().collect();
-                            }
+                    ":w" | ":write" => match self.model.save() {
+                        Ok(_) => {
+                            self.msg_display = "Wrote file".chars().collect();
                         }
-                    }
+                        Err(e) => {
+                            self.msg_display = format!("Error: could not write file: {}", e)
+                                .chars()
+                                .collect();
+                        }
+                    },
                     ":q" | ":quit" => self.exit(),
-                    ":wq" => {
-                        match self.model.save() {
-                            Ok(_) => {
-                                self.exit();
-                            }
-                            Err(e) => {
-                                self.msg_display =
-                                    format!("Error: could not write file: {}", e).chars().collect();
-                            }
+                    ":wq" => match self.model.save() {
+                        Ok(_) => {
+                            self.exit();
                         }
-                    }
+                        Err(e) => {
+                            self.msg_display = format!("Error: could not write file: {}", e)
+                                .chars()
+                                .collect();
+                        }
+                    },
                     ":set number" | ":set num" | ":set nu" | ":num" | ":nu" => {
                         self.show_line_nums = !self.show_line_nums;
                         // TO DO: Make sure to pass in string ref to buffer (smth like that) where self.display_string is below to update View
@@ -498,7 +496,8 @@ impl<'a> App<'a> {
                 self.mode = Mode::Normal;
                 self.snap_cursor();
             }
-            KeyCode::Backspace => self.delete_char(),
+            KeyCode::Backspace => self.backspace_char(),
+            KeyCode::Delete => self.delete_char(),
             KeyCode::Enter => self.insert_char('\n'),
             KeyCode::Tab => self.insert_char('\t'),
             KeyCode::Char(character) => self.insert_char(character),
@@ -507,6 +506,21 @@ impl<'a> App<'a> {
             KeyCode::Left => self.cursor_left(),
             KeyCode::Right => self.cursor_right(),
             _ => {}
+        }
+    }
+    fn backspace_char(&mut self) {
+        let mut file_ind = self.get_cursor_file_index();
+        if file_ind > 0 {
+            file_ind -= 1; // char index of file where character should be deleted
+            self.model.delete_char(file_ind);
+            self.display_content = string_to_lines(
+                self.model.rope.to_string().as_str(),
+                self.term_size.1,
+                self.first_line_num,
+                self.first_char_ind,
+                self.show_line_nums,
+            );
+            self.cursor_left();
         }
     }
     fn delete_char(&mut self) {
@@ -519,7 +533,6 @@ impl<'a> App<'a> {
             self.first_char_ind,
             self.show_line_nums,
         );
-        self.cursor_left();
     }
     fn insert_char(&mut self, c: char) {
         let file_ind = self.get_cursor_file_index(); // char index of file where character should be inserted
