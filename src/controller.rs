@@ -520,8 +520,7 @@ impl<'a> App<'a> {
                 self.mode = Mode::Normal;
             }
             KeyCode::Enter => {
-                // TO DO: Actually perform the search with buffer instead of dummy_search. Only transition to search mode if matches found
-                if let Some(num_matches) = self.dummy_search() {
+                if let Some(num_matches) = self.model.run_search() {
                     self.search_term = Some(self.msg_display[1..].iter().collect());
                     let mut message = num_matches.to_string();
                     message.push_str(" matches");
@@ -540,14 +539,6 @@ impl<'a> App<'a> {
             }
             KeyCode::Char(character) => self.msg_display.push(character),
             _ => {}
-        }
-    }
-    fn dummy_search(&self) -> Option<usize> {
-        let query: String = self.msg_display[1..].iter().collect();
-        if self.model.rope.to_string().contains(&query) {
-            return Some(self.model.rope.to_string().matches(&query).count());
-        } else {
-            return None;
         }
     }
 
