@@ -147,32 +147,36 @@ rust-vim also works with paths to files that are not in the current directory. F
 
 	rust-vim rust_is_cool/rustacean.txt
 
-## Tentative Plan
-We plan on applying the Model-View-Controller architecture for this project. 
 
-The Model component holds an in-memory representation of the text. Its major functionalities include file I/O, insertion, deletion, replacement, and search. 
+## Table of Contributions
+| Name | Task | Other Notes |
+|-|-|-|
+|Ray|Terminal UI Setup|<ul><li>Clear the terminal and display the application</li><li>Restore the terminal on app closure</li><li>Accept user inputs</li><li>Handle the user resizing terminal window without crashing</li></ul> |
+|Ray|Status/Message Bar|<ul><li>Display current mode</li><li>Display error messages</li><li>Display user input</li><li>Display cursor infile location</li></ul> |
+|James|Read from file system to buffer||
+|Ray|Text Wrapping|<ul><li>Must adapt to terminal resizing</li></ul>|
+|Ray|Cursor Positioning, Tracking, and Movement|<ul><li>Cursor must be bound to file contents and terminal window</li><li>Cursor's infile location must be tracked for backend use</li><li>Snap cursor to end of line when needed</li><li>Slip cursor through wide characters</li><li>Must adapt to user shrinking terminal window by pushing cursor up/left as needed</li></ul>|
+|Ray|Scroll File Contents||
+|James|Insert content to buffer||
+|James|Delete content from buffer||
+|Ray|Controller State Machine for Vim Modes|<ul><li>Some features were implemented as extra modes under the hood</li></ul>|
+|Ray|Highlight Matches to Search Queries||
+|James|Search for content in buffer||
+|Ray|Implement Line Number Toggle Command|<ul><li>Shift file contents and cursor as needed to adapt to added UI elements</li></ul>|
+|Ray|Help Pop-up Window||
+|James|Write to file system||
 
-The View component is responsible for displaying the right content on the screen given the cursor location and the buffer content.
+## Lessons Learned and Concluding Remarks
+Two key lessons were learned from this project.
 
-The Controller module is primarily responsible for handling the user inputs, parsing commands, keeping track of the current mode, and coordinating with the Model component and View component.  
+For one, we learned firsthand about the many struggles that can arise when co-operatively developing code without proper project management. In a professional environment, we would first design an agreed upon blueprint for the overall project as a first step, including overall architecture, skeleton code, and API definitions between key components, before individually working on assigned parts. Unfortunately, due to our busy schedules, we were unable to meet up and create this blueprint, instead skipping this crucial first step and jumping straight into writing code. As a result, our code does not follow the proposed MVC architecture very strictly, which may result in problems such as code readability, maintainability, scalability, and potentially even performance drawbacks. 
 
-James will be responsible for the model component as he has prior work experience and expertise with buffer management. Ray will focus on the front-end tasks such as the UI and the input controller, due to his interests and experiences with front-end development from prior coursework. The following table shows a more detailed breakdown of tasks and their assignment. Component-API level unit testing will be taken care of by its respective owners. The final system integration will be a joint effort between James and Ray.
+One key example of this is the display_content which was stored in the App struct in the controller. The display_content field of the App struct is meant to store the wrapped lines of text (along with metadata like line number) for the View to display. According to the MVC architecture, the display_content would be more appropriately located in either the View (since the wrapped lines would be directly displayed) or the Model (since the original lines of text should be managed by the Model). Instead, the current implementation was built based on a tutorial for the ratatui crate (https://ratatui.rs/tutorials/json-editor/app/) which uses a different paradigm, where the entire App state is managed in one struct (which we placed in the controller to manage other state variables such as mode), while another file handles the actual display in the terminal. As a result, there was some confusion on implementation when passing the project between hands. 
 
-| Task                                                | Team Member Responsible                                       |
-| --------------------------------------------------- | ------------------------------------------------------------- |
-| Terminal UI Initialization                          | Ray                                                           |
-| Caret positioning and movement                      | Ray                                                           |
-| Status/Message Bar                                  | Ray                                                           |
-| Read from file system to buffer                     | James                                                         |
-| Searching for content in buffer                     | James                                                         |
-| File content renderer                               | Ray                                                           |
-| UI Scrolling                                        | Ray                                                           |
-| Controller state machine for Vim Modes              | Ray                                                           |
-| Implement line number toggle command                | Ray                                                           |
-| Inserting content to the buffer                     | James                                                         |
-| Write to file system                                | James                                                         |
-| Deleting content from buffer                        | James                                                         |
-| Copying content from buffer                         | James                                                         |
-| Updating file renderer to respond to buffer changes | Ray                                                           |
-| Add colors to file renderer                         | Ray                                                           |
-| Implement Copilot LLM Support                       | To-be-determined based on the actual progress of the project. |
+Another key lesson learned from this project was the complexity that can go into developing effective text writers. One example was figuring out how to manage the cursor’s location in the file, with many unexpected complications arising such as the presence of wide characters, which if improperly handled, could result in the cursor entering an illegal position in the middle of the character. 
+
+Tracking the cursor was also difficult because of the text wrapping, which meant that one line in the file could actually be represented by multiple lines on the terminal window. This meant that tracking things such as the cursor’s infile line index, and the cursor’s infile column number, couldn’t be done by simply using the cursor’s coordinates in the terminal. Instead, relevant details for each displayed line had to be stored separately, and then looked up in order to calculate the cursor’s infile line index and infile column number. The requirement of handling terminal resizing and scrolling only made this task more complex
+
+Due to these complexities and inefficiencies caused by poor project management, we were also unfortunately unable to complete the bonus objectives of implementing LSP and LLM support into rust-vim for the submission of this project. However, there were plans to do so using the llm-lsp rust crate (https://crates.io/crates/llm-lsp) or similar crates. 
+
+To conclude, while there is still plenty of work that could be done to improve this application, developing rusty-vim was still a very intellectually stimulating experience, which taught us many lessons about both technical details of developing an application in rust with the crates used, as well as the importance of proper project management and organization. The unexpected complexity and challenges faced in this project have also given us a much greater appreciation for all the different considerations that must be taken when developing something as seemingly simple as a CLI text editor. 
