@@ -416,11 +416,10 @@ impl<'a> App<'a> {
                 self.mode = Mode::SearchInput;
                 self.msg_display = vec!['/'];
             }
-            KeyCode::Char('h') | KeyCode::Char('H') => self.mode = Mode::Help,
-            KeyCode::Up => self.cursor_up(),
-            KeyCode::Down => self.cursor_down(),
-            KeyCode::Left => self.cursor_left(),
-            KeyCode::Right => self.cursor_right(),
+            KeyCode::Up | KeyCode::Char('k') => self.cursor_up(),
+            KeyCode::Down | KeyCode::Char('j') => self.cursor_down(),
+            KeyCode::Left | KeyCode::Char('h') => self.cursor_left(),
+            KeyCode::Right | KeyCode::Char('l') => self.cursor_right(),
             _ => {}
         };
     }
