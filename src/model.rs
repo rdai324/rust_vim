@@ -24,7 +24,7 @@ pub struct EditorModel {
     pub mode: Mode,
     pub file_name: String,
     pub command: String,
-    pub search_query: String,
+    // pub search_query: String,
 
     pub visual_start: Option<(usize, usize)>,
 
@@ -41,7 +41,7 @@ impl EditorModel {
             mode: Mode::Normal,
             file_name: String::from(file_name),
             command: String::new(),
-            search_query: String::new(),
+            // search_query: String::new(),
             visual_start: None,
             status: "-- NORMAL --".into(),
             search_matches: vec![],
@@ -133,21 +133,21 @@ impl EditorModel {
         }
     }
 
-    pub fn run_search(&mut self) -> Option<usize> {
+    pub fn run_search(&mut self, search_query: &str) -> usize {
         let mut num_matches = 0;
         self.search_matches.clear();
-        if self.search_query.is_empty() {
-            return None;
+        if search_query.is_empty() {
+            return 0;
         }
-        let re = Regex::new(&self.search_query).unwrap();
+        let re = Regex::new(&search_query).unwrap();
         let lines = self.rope.len_lines();
         for y in 0..lines {
             let line = self.rope.line(y).to_string();
-            for mat in re.find_iter(&line) {
+            for _ in re.find_iter(&line) {
                 num_matches += 1;
             }
         }
-        return Some(num_matches);
+        return num_matches;
     }
 
     pub fn jump_next_match(&mut self) {

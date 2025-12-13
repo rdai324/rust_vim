@@ -2,6 +2,7 @@ use crate::model::{self, EditorModel};
 use crate::view::MAX_HELP_SCROLL;
 use count_digits::CountDigits;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use core::num;
 use std::cmp;
 use std::fs;
 use std::io;
@@ -558,8 +559,10 @@ impl<'a> App<'a> {
                 self.mode = Mode::Normal;
             }
             KeyCode::Enter => {
-                if let Some(num_matches) = self.model.run_search() {
-                    self.search_term = Some(self.msg_display[1..].iter().collect());
+                let search_query : String = self.msg_display[1..].iter().collect();
+                let num_matches = self.model.run_search(search_query.as_str());
+                if num_matches > 0 {
+                    self.search_term = Some(search_query);
                     let mut message = num_matches.to_string();
                     message.push_str(" matches");
                     self.msg_display = message.chars().collect();
