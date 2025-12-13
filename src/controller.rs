@@ -1,4 +1,5 @@
 use crate::view::MAX_HELP_SCROLL;
+use crate::model::{self, EditorModel};
 use count_digits::CountDigits;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use std::cmp;
@@ -135,8 +136,7 @@ impl DisplayLine {
 
 #[derive(Debug)]
 pub struct App<'a> {
-    filename: &'a str,                 // Name of the file opened
-    display_string: &'a str, // TEMP until buffer implemented. All references to this should be replaced by references to buffer.
+    model: &'a mut EditorModel,
     display_content: Vec<DisplayLine>, // Vector of DisplayLine structs representing content being displayed + useful info
     first_line_num: usize, // What is the line number of the first line loaded? Used for line number display
     first_char_ind: usize, // What is the infile character index of the first character loaded? Used for cursor indexing
@@ -153,14 +153,13 @@ pub struct App<'a> {
 
 impl<'a> App<'a> {
     pub fn new(
-        filename: &'a mut str,
-        display_string: &'a mut str,
+        model: &'a mut EditorModel,
+        display_string: &'a str,
         term_height: u16,
         term_width: u16,
     ) -> Self {
         Self {
-            filename,
-            display_string,
+            model: model,
             display_content: string_to_lines(display_string, term_width, 1, 0, false),
             first_line_num: 1,
             first_char_ind: 0,
@@ -180,7 +179,7 @@ impl<'a> App<'a> {
      * Get ___ methods below:
      */
     pub fn get_filename(&self) -> &str {
-        return self.filename;
+        return &self.model.file_name.as_str();
     }
     pub fn get_content(&self) -> &Vec<DisplayLine> {
         return &self.display_content;
@@ -321,7 +320,7 @@ impl<'a> App<'a> {
 
         // TO DO: Future should use ref to buffer instead of display_string
         self.display_content = string_to_lines(
-            self.display_string,
+            self.model.rope.to_string().as_str(),
             term_width,
             self.first_line_num,
             self.first_char_ind,
@@ -442,7 +441,7 @@ impl<'a> App<'a> {
                         self.show_line_nums = !self.show_line_nums;
                         // TO DO: Make sure to pass in string ref to buffer (smth like that) where self.display_string is below to update View
                         self.display_content = string_to_lines(
-                            self.display_string,
+                            self.model.rope.to_string().as_str(),
                             self.term_size.1,
                             self.first_line_num,
                             self.first_char_ind,
@@ -491,11 +490,10 @@ impl<'a> App<'a> {
         }
     }
     fn delete_char(&mut self) {
-        /* TO DO actually delete the character from the buffer*/
         let file_ind = self.get_cursor_file_index(); // char index of file where character should be deleted
-        // TO DO: Make sure to pass in string ref to buffer (smth like that) where self.display_string is below to update View
+        self.model.delete_char(file_ind);
         self.display_content = string_to_lines(
-            self.display_string,
+            self.model.rope.to_string().as_str(),
             self.term_size.1,
             self.first_line_num,
             self.first_char_ind,
@@ -504,11 +502,10 @@ impl<'a> App<'a> {
         self.cursor_left();
     }
     fn insert_char(&mut self, c: char) {
-        /* TO DO actually insert the character into the buffer*/
         let file_ind = self.get_cursor_file_index(); // char index of file where character should be inserted
-        // TO DO: Make sure to pass in string ref to buffer (smth like that) where self.display_string is below to update View
+        self.model.insert_char(c, file_ind);
         self.display_content = string_to_lines(
-            self.display_string,
+            self.model.rope.to_string().as_str(),
             self.term_size.1,
             self.first_line_num,
             self.first_char_ind,
@@ -548,8 +545,8 @@ impl<'a> App<'a> {
     }
     fn dummy_search(&self) -> Option<usize> {
         let query: String = self.msg_display[1..].iter().collect();
-        if self.display_string.contains(&query) {
-            return Some(self.display_string.matches(&query).count());
+        if self.model.rope.to_string().contains(&query) {
+            return Some(self.model.rope.to_string().matches(&query).count());
         } else {
             return None;
         }

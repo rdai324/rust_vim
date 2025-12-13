@@ -1,3 +1,4 @@
+mod model;
 mod controller;
 mod view;
 use controller::App;
@@ -30,25 +31,23 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
 fn main() -> io::Result<()> {
     let opts = Opt::from_args();
 
-    let mut naive_buffer = match fs::read_to_string(&opts.file_name) {
-        Ok(text) => text,
-        Err(ref e) if e.kind() == io::ErrorKind::NotFound => String::from(" "), // File name not found, so treat it as a new file
-        Err(error) => panic!("{error}"),
-    };
+    let file_path = opts.file_name;
+    if !file_path.exists() {
+        if let Some(parent) = file_path.parent() {
+            if !parent.exists() {
+                fs::create_dir_all(parent)?;
+            }
+        }
+        fs::File::create(&file_path)?; // create an empty file
+    }
 
-    let mut file_name = String::from(
-        opts.file_name
-            .file_name()
-            .expect("Error: Invalid file path provided.")
-            .to_str()
-            .expect("Error: File name not UTF-8 valid"),
-    );
+    let mut model = model::EditorModel::new(file_path.to_str().unwrap());
 
     let mut terminal = ratatui::init();
     let term_height = terminal.size()?.height;
     let term_width = terminal.size()?.width;
-
-    let mut app = App::new(&mut file_name, &mut naive_buffer, term_height, term_width);
+    let display_string = model.rope.to_string();
+    let mut app = App::new(&mut model, display_string.as_str(), term_height, term_width);
 
     let app_result = run_app(&mut terminal, &mut app);
 
