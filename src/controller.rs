@@ -27,6 +27,9 @@ fn string_to_lines(
     first_char_ind: usize,
     show_lines: bool,
 ) -> Vec<DisplayLine> {
+    if string.len() == 0 {
+        return vec![DisplayLine::new(first_line_num, first_char_ind, 0)];
+    }
     let chars = string.chars();
     let max_line_len = term_width - 2; // to accomodate the two borders
     let mut lines: Vec<DisplayLine> = Vec::new();
@@ -733,7 +736,7 @@ impl<'a> App<'a> {
     fn snap_cursor(&mut self) {
         // Get end of line coordinates
         let line = &self.display_content[self.get_cursor_display_row()].line_content;
-        let mut bound = width(line);
+        let mut bound = cmp::max(width(line), 1);
 
         // Allow the cursor to move to the end of the line if in insertion mode
         if let Mode::Insert = self.mode {
