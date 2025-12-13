@@ -224,7 +224,7 @@ impl<'a> App<'a> {
      */
     pub fn get_mode_text(&self) -> &str {
         match &self.mode {
-            Mode::Normal => return "Normal Mode [h]=>Help [i]=>Insert [:]=>Command [/]=>Search",
+            Mode::Normal => return "Normal Mode [z]=>Help [i]=>Insert [:]=>Command [/]=>Search",
             Mode::Command => return "Command Mode [ENTER]=>Submit [ESC]=>Exit",
             Mode::SearchInput => return "Search Mode [ENTER]=>Submit [ESC]=>Exit",
             Mode::Search => return "Search Mode [n]=>Next [p]=>Prev [ESC]=>Exit",
@@ -420,6 +420,7 @@ impl<'a> App<'a> {
                 self.mode = Mode::SearchInput;
                 self.msg_display = vec!['/'];
             }
+            KeyCode::Char('z') | KeyCode::Char('Z') => self.mode = Mode::Help,
             KeyCode::Up | KeyCode::Char('k') => self.cursor_up(),
             KeyCode::Down | KeyCode::Char('j') => self.cursor_down(),
             KeyCode::Left | KeyCode::Char('h') => self.cursor_left(),
