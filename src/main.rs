@@ -1,5 +1,5 @@
-mod model;
 mod controller;
+mod model;
 mod view;
 use controller::App;
 use ratatui::{Terminal, prelude::Backend};
@@ -29,8 +29,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
 }
 
 fn main() -> io::Result<()> {
+    // Read arguments and open file
     let opts = Opt::from_args();
-
     let file_path = opts.file_name;
     if !file_path.exists() {
         if let Some(parent) = file_path.parent() {
@@ -41,8 +41,10 @@ fn main() -> io::Result<()> {
         fs::File::create(&file_path)?; // create an empty file
     }
 
+    // build model buffer
     let mut model = model::EditorModel::new(file_path.to_str().unwrap());
 
+    // Initialize terminal and build App structure containing app state
     let mut terminal = ratatui::init();
     let term_height = terminal.size()?.height;
     let term_width = terminal.size()?.width;
@@ -51,6 +53,7 @@ fn main() -> io::Result<()> {
 
     let app_result = run_app(&mut terminal, &mut app);
 
+    // Restore the terminal on closure
     ratatui::restore();
     app_result
 }
