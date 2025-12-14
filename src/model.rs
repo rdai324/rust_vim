@@ -23,10 +23,12 @@ impl EditorModel {
         self.rope.insert_char(char_idx, ch);
     }
 
-    pub fn delete_char(&mut self, char_idx: usize) {
+    pub fn delete_char(&mut self, char_idx: usize) -> bool {
         if char_idx < self.rope.len_chars() {
             self.rope.remove(char_idx..char_idx + 1);
+            return true;
         }
+        return false;
     }
 
     pub fn delete_range(&mut self, start_idx: usize, end_idx: usize) {

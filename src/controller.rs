@@ -753,9 +753,12 @@ impl<'a> App<'a> {
     }
     fn delete_char(&mut self) {
         let file_ind = self.get_cursor_file_index(); // char index of file where character should be deleted
-        self.model.delete_char(file_ind);
-        // Re-wrap file content for display
-        self.wrap_text();
+        if self.model.delete_char(file_ind) {
+            // Re-wrap file content for display
+            self.wrap_text();
+        } else {
+            self.msg_display = "Error: End of file reached".chars().collect();
+        }
     }
     fn insert_char(&mut self, c: char) {
         let file_ind = self.get_cursor_file_index(); // char index of file where character should be inserted
