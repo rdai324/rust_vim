@@ -1,7 +1,6 @@
 
 use regex::Regex;
 use ropey::Rope;
-use std::cmp;
 use std::fs::File;
 use std::io::BufReader;
 use std::io;
