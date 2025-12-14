@@ -30,7 +30,8 @@ Commands:
 :q => Quit editing
 :w => Write to file
 :wq => Write to file, then quit
-:num => Toggle line numbers";
+:num => Toggle line numbers
+:dd => Delete current line of file";
 
 const RIGHT_HELP_TEXT: &str = "Insertion Mode:
 Move the cursor with arrow keys
@@ -274,13 +275,18 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
         frame.render_widget(save_and_quit_box, selection_layout[0]);
     }
 
-    // Render cursor
-    if let Mode::Insert = app_mode {
-        execute!(stdout(), SetCursorStyle::BlinkingBar).unwrap();
-    } else {
-        execute!(stdout(), SetCursorStyle::BlinkingBlock).unwrap();
+    // Render cursor if not in pop-up modes
+    match app_mode {
+        Mode::Normal | Mode::Command | Mode::SearchInput => {
+            execute!(stdout(), SetCursorStyle::BlinkingBlock).unwrap();
+            frame.set_cursor_position(Position::new(cursor_pos.1, cursor_pos.0));
+        }
+        Mode::Insert => {
+            execute!(stdout(), SetCursorStyle::BlinkingBar).unwrap();
+            frame.set_cursor_position(Position::new(cursor_pos.1, cursor_pos.0));
+        }
+        _ => {}
     }
-    frame.set_cursor_position(Position::new(cursor_pos.1, cursor_pos.0));
 }
 
 // helper function to create a centered rect using up certain percentage of the available rect `r`
