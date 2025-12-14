@@ -14,10 +14,11 @@ use std::cmp::max;
 use std::io::stdout;
 
 const LEFT_HELP_TEXT: &str = "Normal Mode:
-Move the cursor with arrow keys
+Move the cursor with arrow keys or hjkl
 [i] to start editing text in Insertion Mode
 [:] to start typing in Command Mode
 [/] to start a query in Search Input Mode
+[Esc] to turn off Search Highlights
 
 Command Mode:
 [Esc] to cancel and return to Normal Mode
@@ -31,35 +32,37 @@ Commands:
 const RIGHT_HELP_TEXT: &str = "Insertion Mode:
 Move the cursor with arrow keys
 Type to insert characters at the cursor location
-[Backspace] to delete characters at the cursor location
+[Enter] to insert a new line
+[Backspace] to delete characters left of the cursor location
+[Del] to delete characters right of the cursor location
 [Esc] to return to Normal Mode
 
 Search Input Mode:
 [Esc] to cancel and return to Normal Mode
-[Enter] to submit the search query and enter Search Mode
-
-Search Mode:
-[Esc] to cancel and return to Normal Mode
-[n] to jump to the next match
-[p] to jump to the previous match";
+[Enter] to submit the search query and highlight matches";
 
 pub const MAX_HELP_SCROLL: u16 = 14;
 
 pub fn draw_ui(frame: &mut Frame, app: &mut App) {
+    // For the main content section of UI
     let file_name = app.get_filename();
     let display_lines = app.get_content();
     let show_line_num = app.get_show_line_num();
     let search_term = app.get_search_term();
 
+    // For message bar of UI
     let mode_text = app.get_mode_text();
     let ui_message = app.get_msg_display();
 
-    let app_mode = app.get_app_mode();
+    // For cursor location section of UI
     let scroll_amount = app.get_scroll_amount();
-    let help_scroll = app.get_scroll_help_amount();
     let cursor_pos = app.get_cursor_pos();
     let curr_row = display_lines[(scroll_amount + cursor_pos.0) as usize - 1].line_num;
     let curr_col = app.get_cursor_inline_index();
+
+    // Other important items used for View UI
+    let app_mode = app.get_app_mode();
+    let help_scroll = app.get_scroll_help_amount();
 
     let layout = Layout::default()
         .direction(Direction::Vertical)
@@ -86,6 +89,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     {
         let mut display_line = vec![];
 
+        // Format line numbers with yellow color
         let mut line_content_index = 0;
         if show_line_num {
             line_content_index = line.find('|').unwrap();
@@ -95,20 +99,22 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
             ));
         }
 
-        if let Some(keyword) = search_term
-            && line[line_content_index..].contains(keyword)
-        {
-            // There was a positive search result, highlight possible matches
-            let mut substrings = line[line_content_index..].split(keyword);
+        // Highlight search matches if present
+        if line[line_content_index..].contains(search_term) {
+            let mut substrings = line[line_content_index..].split(search_term);
+            // Split before match should be displayed as normal white text
             display_line.push(Span::raw(substrings.next().unwrap())); // The first elem of this iterator shouldn't be empty
             for substring in substrings {
+                // Highlighted search match
                 display_line.push(Span::styled(
-                    keyword,
+                    search_term,
                     Style::default().fg(Color::White).bg(Color::Cyan),
                 ));
+                // normal white text (not search match)
                 display_line.push(Span::raw(substring));
             }
         } else {
+            // No search matches, display as normal white text
             display_line.push(Span::styled(&line[line_content_index..], Style::default()));
         }
         display_content.push(display_line.into());
@@ -138,7 +144,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     // Second line contains user input, or messages to user
     let ui_text: Line;
     // Highlight error messages in red
-    if ui_message.contains("Error") {
+    if ui_message.starts_with("Error") {
         ui_text =
             Line::styled(ui_message, Style::default().fg(Color::Black).bg(Color::Red)).centered();
     } else {

@@ -1,10 +1,9 @@
-use crate::model::{self, EditorModel};
+use crate::model::EditorModel;
 use crate::view::MAX_HELP_SCROLL;
 use core::num;
 use count_digits::CountDigits;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use std::cmp;
-use std::fs;
 use std::io;
 use unicode_display_width::width;
 
@@ -15,32 +14,26 @@ pub enum Mode {
     Normal,
     Command,
     SearchInput,
-    Search,
     Insert,
     Minimized, //Used to prevent cursor out of bounds crash when terminal is shrunk to <=4 lines tall
     Help,      // Used to display the help screen
 }
 
-fn string_to_lines(
-    string: &str,
-    term_width: u16,
-    first_line_num: usize,
-    first_char_ind: usize,
-    show_lines: bool,
-) -> Vec<DisplayLine> {
+fn string_to_lines(string: &str, term_width: u16, show_lines: bool) -> Vec<DisplayLine> {
     if string.len() == 0 {
-        return vec![DisplayLine::new(first_line_num, first_char_ind, 0)];
+        return vec![DisplayLine::new(1, 0, 0)];
     }
     let chars = string.chars();
     let max_line_len = term_width - 2; // to accomodate the two borders
+
+    // Start constructing vector of wrapped display lines
     let mut lines: Vec<DisplayLine> = Vec::new();
-    let mut line = DisplayLine::new(first_line_num, first_char_ind, 0);
+    let mut line = DisplayLine::new(1, 0, 0); // First (1) line has infile and inline char indices of 0
     let mut num_chars = 0; // Used for calculating file indexing
     let mut total_char_width = 0; // Used to track how many characters can fit on a line
     if show_lines {
-        line.line_content = first_line_num.to_string();
-        line.line_content.push('|');
-        total_char_width = first_line_num.count_digits() as u16 + 1;
+        line.line_content = String::from("1|");
+        total_char_width = 2;
     }
     for character in chars {
         // if character is a newline, stop building line and append it to lines
@@ -90,6 +83,7 @@ fn string_to_lines(
         }
 
         // Add character to line to be rendered
+        // Handle tabs specially due to dynamic sizes
         if character == '\t' {
             // Render tab space as a set of spaces
             // while keeping track of which of them are 'invalid' for the cursor
@@ -101,9 +95,10 @@ fn string_to_lines(
             }
             total_char_width += char_width;
         } else {
+            // Render character and...
             line.line_content.push(character);
             num_chars += 1;
-            // Keep track of 'invalid columns' for cursor due to wide characters
+            // ...Keep track of 'invalid columns' for cursor due to wide characters
             for i in 1..char_width {
                 line.invalid_cols.push(total_char_width + 1 + i)
             }
@@ -120,10 +115,10 @@ fn string_to_lines(
 
 #[derive(Debug)]
 pub struct DisplayLine {
-    pub line_content: String,
-    pub line_num: usize,
-    pub infile_index: usize, // Char index of the start of this displayed line in the total file
-    pub inline_index: usize, // Char index of the start of this displayed line in the file line
+    pub line_content: String,   // String to display in the terminal
+    pub line_num: usize,        // In file line number
+    pub infile_index: usize,    // Char index of the start of this displayed line in the total file
+    pub inline_index: usize,    // Char index of the start of this displayed line in the file line
     pub invalid_cols: Vec<u16>, // used to ensure cursor is never in the middle of a multi-column character
 }
 
@@ -143,16 +138,15 @@ impl DisplayLine {
 pub struct App<'a> {
     model: &'a mut EditorModel,
     display_content: Vec<DisplayLine>, // Vector of DisplayLine structs representing content being displayed + useful info
-    first_line_num: usize, // What is the line number of the first line loaded? Used for line number display
-    first_char_ind: usize, // What is the infile character index of the first character loaded? Used for cursor indexing
-    scroll_amount: u16,    // How far did we scroll down display_content?
-    scroll_help_amount: u16, // How far to scroll help popup
+    scroll_amount: u16,                // How far did we scroll down display_content?
+    scroll_help_amount: u16,           // How far to scroll help popup
     mode: Mode,
     show_line_nums: bool,
-    msg_display: Vec<char>, // Input taken from user for commands or searching
-    search_term: Option<String>, // What is being searched for in search mode. Only assigned on successful match for View highlighting
+    msg_display: Vec<char>, // What to show in the bottom message bar (user input, error messages, etc.)
+    search_term: String, // What is being searched for in search mode. Only assigned on successful match for View highlighting
+    num_matches: usize,  // Number of search matches found
     cursor_pos: (u16, u16), // cursor position in terminal. (y, x), or (row, col), with 1,1 being the top-left corner (1 not 0 due to border)
-    term_size: (u16, u16),  // Terminal size
+    term_size: (u16, u16),  // Terminal size (Num rows, num cols)
     running: bool,
 }
 
@@ -165,15 +159,14 @@ impl<'a> App<'a> {
     ) -> Self {
         Self {
             model: model,
-            display_content: string_to_lines(display_string, term_width, 1, 0, false),
-            first_line_num: 1,
-            first_char_ind: 0,
+            display_content: string_to_lines(display_string, term_width, false),
             scroll_amount: 0,
             scroll_help_amount: 0,
             mode: Mode::Normal,
             show_line_nums: false,
             msg_display: vec![],
-            search_term: None,
+            search_term: String::new(),
+            num_matches: 0,
             cursor_pos: (1, 1),
             term_size: (term_height, term_width),
             running: true,
@@ -188,12 +181,6 @@ impl<'a> App<'a> {
     }
     pub fn get_content(&self) -> &Vec<DisplayLine> {
         return &self.display_content;
-    }
-    pub fn get_first_line_num(&self) -> usize {
-        return self.first_line_num;
-    }
-    pub fn get_first_char_ind(&self) -> usize {
-        return self.first_char_ind;
     }
     pub fn get_app_mode(&self) -> &Mode {
         return &self.mode;
@@ -210,10 +197,7 @@ impl<'a> App<'a> {
     pub fn get_scroll_help_amount(&self) -> u16 {
         return self.scroll_help_amount;
     }
-    pub fn get_term_size(&self) -> (u16, u16) {
-        return self.term_size;
-    }
-    pub fn get_search_term(&self) -> &Option<String> {
+    pub fn get_search_term(&self) -> &str {
         return &self.search_term;
     }
     pub fn get_show_line_num(&self) -> bool {
@@ -228,7 +212,6 @@ impl<'a> App<'a> {
             Mode::Normal => return "Normal Mode [z]=>Help [i]=>Insert [:]=>Command [/]=>Search",
             Mode::Command => return "Command Mode [ENTER]=>Submit [ESC]=>Exit",
             Mode::SearchInput => return "Search Mode [ENTER]=>Submit [ESC]=>Exit",
-            Mode::Search => return "Search Mode [n]=>Next [p]=>Prev [ESC]=>Exit",
             Mode::Insert => return "Insertion Mode [ESC]=>Exit",
             Mode::Minimized => return "Please Enlarge Terminal Window",
             Mode::Help => return "Help Page [ESC]=>Exit [^][v] to Scroll Help Text",
@@ -275,9 +258,11 @@ impl<'a> App<'a> {
             .iter()
             .filter(|col| col < &&self.cursor_pos.1)
             .count();
+
+        // Sum the infile index of the displayed line the cursor is on, with the cursor position, and subtract non-char columns
         let mut index = &line.infile_index + (self.cursor_pos.1 as usize) - num_skipped_cols;
         if let Mode::Insert = self.mode {
-            index -= 1;
+            index -= 1; // Insertion mode has a thinner cursor that can move into 0 indexing
         }
         if self.show_line_nums {
             index -= line.line_num.count_digits() as usize + 1; // subtract the line number characters
@@ -315,29 +300,38 @@ impl<'a> App<'a> {
     pub fn update_term_size(&mut self, term_height: u16, term_width: u16) {
         self.term_size = (term_height, term_width);
 
+        // Used to prevent panic from shrinking terminal too small
         if term_height <= 4 {
             self.mode = Mode::Minimized;
             self.cursor_pos = (1, 1);
             return;
         }
+        // Use to return to normal functionality after enlarging terminal back to usable size
         if let Mode::Minimized = self.mode {
             if term_height > 4 {
                 self.mode = Mode::Normal;
+                // Clear any previous unsubmitted user input
+                if self.num_matches == 0 {
+                    self.msg_display = vec![];
+                } else {
+                    // Re-display search matches message if we are still highlighting
+                    let mut message = self.num_matches.to_string();
+                    message.push_str(" matches for ");
+                    message.push_str(&self.search_term);
+                    self.msg_display = message.chars().collect();
+                }
             }
         }
 
-        // TO DO: Future should use ref to buffer instead of display_string
+        // Re-wrap display content
         self.display_content = string_to_lines(
             self.model.rope.to_string().as_str(),
             term_width,
-            self.first_line_num,
-            self.first_char_ind,
             self.show_line_nums,
         );
 
         // Update cursor position if terminal size shrunk
         if self.cursor_pos.1 > self.term_right_cursor_bound() {
-            // TO DO: Check if in insertion mode
             self.cursor_pos.1 = self.term_right_cursor_bound();
         }
         if self.cursor_pos.0 > self.term_bottom_cursor_bound() {
@@ -346,7 +340,6 @@ impl<'a> App<'a> {
 
         // Edge case if enlarging terminal window and unwrapping displayed text reduced number of rows occupied by text
         if self.cursor_pos.0 > self.display_content.len() as u16 {
-            // TO DO: Attempt to load into buffer before giving up and shifting cursor back up
             self.cursor_pos.0 = self.display_content.len() as u16;
         }
 
@@ -378,6 +371,7 @@ impl<'a> App<'a> {
                     self.handle_key_event(key_event)
                 }
             }
+            // Handle terminal resizing
             Event::Resize(col, row) => self.update_term_size(row, col),
             _ => {}
         };
@@ -393,7 +387,6 @@ impl<'a> App<'a> {
             Mode::Insert => self.insert_handle_key_event(key_event),
             Mode::Normal => self.normal_handle_key_event(key_event),
             Mode::SearchInput => self.search_input_handle_key_event(key_event),
-            Mode::Search => self.search_handle_key_event(key_event),
             Mode::Minimized => {}
             Mode::Help => self.help_handle_key_event(key_event),
         }
@@ -401,10 +394,12 @@ impl<'a> App<'a> {
 
     fn help_handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
+            // Close help pop-up
             KeyCode::Esc => {
                 self.mode = Mode::Normal;
                 self.scroll_help_amount = 0;
             }
+            // Scroll help pop-up contents
             KeyCode::Up | KeyCode::Char('^') => self.scroll_help_up(),
             KeyCode::Down | KeyCode::Char('v') | KeyCode::Char('V') => self.scroll_help_down(),
             _ => {}
@@ -413,18 +408,39 @@ impl<'a> App<'a> {
 
     fn normal_handle_key_event(&mut self, key_event: KeyEvent) {
         // Clear any error/status messages once the user makes an input
-        self.msg_display = vec![];
+        if self.num_matches == 0 {
+            self.msg_display = vec![];
+        } else {
+            // Re-display search matches message if we are still highlighting
+            let mut message = self.num_matches.to_string();
+            message.push_str(" matches for ");
+            message.push_str(&self.search_term);
+            self.msg_display = message.chars().collect();
+        }
         match key_event.code {
+            // Turn off any search highlighting
+            KeyCode::Esc => {
+                self.search_term = String::new();
+                self.num_matches = 0;
+                self.msg_display = vec![];
+            }
+            // Enter insert mode
             KeyCode::Char('i') | KeyCode::Char('I') => self.mode = Mode::Insert,
+            // Enter command mode
             KeyCode::Char(':') => {
                 self.mode = Mode::Command;
                 self.msg_display = vec![':'];
             }
+            // Enter search mode
             KeyCode::Char('/') => {
                 self.mode = Mode::SearchInput;
+                self.search_term = String::new();
+                self.num_matches = 0;
                 self.msg_display = vec!['/'];
             }
+            // Open help popup
             KeyCode::Char('z') | KeyCode::Char('Z') => self.mode = Mode::Help,
+            // Move cursor
             KeyCode::Up | KeyCode::Char('k') => self.cursor_up(),
             KeyCode::Down | KeyCode::Char('j') => self.cursor_down(),
             KeyCode::Left | KeyCode::Char('h') => self.cursor_left(),
@@ -435,13 +451,25 @@ impl<'a> App<'a> {
 
     fn command_handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
+            // Cancel and exit to Normal Mode
             KeyCode::Esc => {
-                self.msg_display = vec![];
+                if self.num_matches != 0 {
+                    // Re-display search matches message if we are still highlighting
+                    let mut message = self.num_matches.to_string();
+                    message.push_str(" matches for ");
+                    message.push_str(&self.search_term);
+                    self.msg_display = message.chars().collect();
+                } else {
+                    // Clear any remaining user input
+                    self.msg_display = vec![];
+                }
                 self.mode = Mode::Normal;
             }
+            // Submit command and execute if it exists
             KeyCode::Enter => {
                 let command: String = self.msg_display.iter().collect();
                 match command.as_str() {
+                    // Write to file
                     ":w" | ":write" => match self.model.save() {
                         Ok(_) => {
                             self.msg_display = "Wrote file".chars().collect();
@@ -452,7 +480,9 @@ impl<'a> App<'a> {
                                 .collect();
                         }
                     },
+                    // Quit
                     ":q" | ":quit" => self.exit(),
+                    // Write and quit
                     ":wq" => match self.model.save() {
                         Ok(_) => {
                             self.exit();
@@ -463,20 +493,30 @@ impl<'a> App<'a> {
                                 .collect();
                         }
                     },
+                    // Toggle line numbers
                     ":set number" | ":set num" | ":set nu" | ":num" | ":nu" => {
                         self.show_line_nums = !self.show_line_nums;
-                        // TO DO: Make sure to pass in string ref to buffer (smth like that) where self.display_string is below to update View
+                        // Re-wrap display content for view
                         self.display_content = string_to_lines(
                             self.model.rope.to_string().as_str(),
                             self.term_size.1,
-                            self.first_line_num,
-                            self.first_char_ind,
                             self.show_line_nums,
                         );
                         self.slip_cursor(); // mainly used when turning on show_line_nums to stay out of line num region
                         self.snap_cursor(); // mainly used when turning off show_line_nums to snap to end of short lines
-                        self.msg_display = vec![];
+
+                        if self.num_matches != 0 {
+                            // Re-display search matches message if we are still highlighting
+                            let mut message = self.num_matches.to_string();
+                            message.push_str(" matches for ");
+                            message.push_str(&self.search_term);
+                            self.msg_display = message.chars().collect();
+                        } else {
+                            // clear the command from the window
+                            self.msg_display = vec![];
+                        }
                     }
+                    // Invalid command
                     _ => {
                         let error_msg = String::from("Error: Invalid Command");
                         self.msg_display = error_msg.chars().collect();
@@ -484,12 +524,21 @@ impl<'a> App<'a> {
                 }
                 self.mode = Mode::Normal;
             }
+            // Delete right-most user input character
             KeyCode::Backspace => {
                 self.msg_display.pop();
                 if self.msg_display.len() == 0 {
+                    if self.num_matches != 0 {
+                        // Re-display search matches message if we are still highlighting
+                        let mut message = self.num_matches.to_string();
+                        message.push_str(" matches for ");
+                        message.push_str(&self.search_term);
+                        self.msg_display = message.chars().collect();
+                    }
                     self.mode = Mode::Normal;
                 }
             }
+            // Type into user input
             KeyCode::Char(character) => self.msg_display.push(character),
             _ => {}
         }
@@ -497,18 +546,32 @@ impl<'a> App<'a> {
 
     fn insert_handle_key_event(&mut self, key_event: KeyEvent) {
         // Clear any error/status messages once the user makes an input
-        self.msg_display = vec![];
+        if self.num_matches != 0 {
+            // Re-display search matches message if we are still highlighting
+            let mut message = self.num_matches.to_string();
+            message.push_str(" matches for ");
+            message.push_str(&self.search_term);
+            self.msg_display = message.chars().collect();
+        } else {
+            self.msg_display = vec![];
+        }
         match key_event.code {
+            // Exit to normal mode
             KeyCode::Esc => {
-                self.msg_display = vec![];
                 self.mode = Mode::Normal;
                 self.snap_cursor();
             }
-            KeyCode::Backspace => self.backspace_char(),
+            // Delete characters
+            KeyCode::Backspace => {
+                self.cursor_left();
+                self.delete_char();
+            }
             KeyCode::Delete => self.delete_char(),
+            // Type characters
             KeyCode::Enter => self.insert_char('\n'),
             KeyCode::Tab => self.insert_char('\t'),
             KeyCode::Char(character) => self.insert_char(character),
+            // Move cursor
             KeyCode::Up => self.cursor_up(),
             KeyCode::Down => self.cursor_down(),
             KeyCode::Left => self.cursor_left(),
@@ -516,40 +579,23 @@ impl<'a> App<'a> {
             _ => {}
         }
     }
-    fn backspace_char(&mut self) {
-        let mut file_ind = self.get_cursor_file_index();
-        if file_ind > 0 {
-            file_ind -= 1; // char index of file where character should be deleted
-            self.model.delete_char(file_ind);
-            self.display_content = string_to_lines(
-                self.model.rope.to_string().as_str(),
-                self.term_size.1,
-                self.first_line_num,
-                self.first_char_ind,
-                self.show_line_nums,
-            );
-            self.cursor_left();
-        }
-    }
     fn delete_char(&mut self) {
         let file_ind = self.get_cursor_file_index(); // char index of file where character should be deleted
         self.model.delete_char(file_ind);
+        // Re-wrap file content for display
         self.display_content = string_to_lines(
             self.model.rope.to_string().as_str(),
             self.term_size.1,
-            self.first_line_num,
-            self.first_char_ind,
             self.show_line_nums,
         );
     }
     fn insert_char(&mut self, c: char) {
         let file_ind = self.get_cursor_file_index(); // char index of file where character should be inserted
         self.model.insert_char(c, file_ind);
+        // Re-wrap file content for display
         self.display_content = string_to_lines(
             self.model.rope.to_string().as_str(),
             self.term_size.1,
-            self.first_line_num,
-            self.first_char_ind,
             self.show_line_nums,
         );
         self.cursor_right();
@@ -557,45 +603,45 @@ impl<'a> App<'a> {
 
     fn search_input_handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
+            // Cancel and exit to Normal Mode
             KeyCode::Esc => {
-                self.msg_display = vec![];
+                if self.num_matches != 0 {
+                    // Re-display search matches message if we are still highlighting
+                    let mut message = self.num_matches.to_string();
+                    message.push_str(" matches for ");
+                    message.push_str(&self.search_term);
+                    self.msg_display = message.chars().collect();
+                } else {
+                    self.msg_display = vec![];
+                }
                 self.mode = Mode::Normal;
             }
+            // Submit search query and see if matches are found
             KeyCode::Enter => {
                 let search_query: String = self.msg_display[1..].iter().collect();
-                let num_matches = self.model.run_search(search_query.as_str());
-                if num_matches > 0 {
-                    self.search_term = Some(search_query);
-                    let mut message = num_matches.to_string();
-                    message.push_str(" matches");
+                self.num_matches = self.model.run_search(search_query.as_str());
+                if self.num_matches > 0 {
+                    // Matches found, update app state so view knows to highlight them
+                    self.search_term = search_query;
+                    let mut message = self.num_matches.to_string();
+                    message.push_str(" matches for ");
+                    message.push_str(&self.search_term);
                     self.msg_display = message.chars().collect();
-                    self.mode = Mode::Search;
                 } else {
                     self.msg_display = "Error: No matches found".chars().collect();
-                    self.mode = Mode::Normal;
                 }
+                self.mode = Mode::Normal;
             }
+            // Delete right-most user input character
             KeyCode::Backspace => {
                 self.msg_display.pop();
+                // If entire user input deleted, return to normal mode
                 if self.msg_display.len() == 0 {
                     self.mode = Mode::Normal;
                 }
             }
+            // Type into user input
             KeyCode::Char(character) => self.msg_display.push(character),
-            _ => {}
-        }
-    }
-
-    fn search_handle_key_event(&mut self, key_event: KeyEvent) {
-        match key_event.code {
-            KeyCode::Esc => {
-                self.search_term = None;
-                self.msg_display = vec![];
-                self.mode = Mode::Normal;
-            }
-            KeyCode::Char('n') => { /*TO DO Scroll to line containing next match if it exists*/ }
-            KeyCode::Char('p') => { /*TO DO Scroll to line containing previous match if it exists*/
-            }
             _ => {}
         }
     }
@@ -608,18 +654,16 @@ impl<'a> App<'a> {
     fn scroll_help_down(&mut self) {
         self.scroll_help_amount = cmp::min(MAX_HELP_SCROLL, self.scroll_help_amount + 1);
     }
+    // Scroll content up, but do not let it scroll out of bounds
     fn scroll_up(&mut self) -> Result<(), &str> {
         if self.scroll_amount > 0 {
             self.scroll_amount -= 1;
             return Ok(());
         } else {
-            // TO DO: Ask buffer to read in another line from rope to the head of buffer, and adjust scroll accordingly
-            // Then, if the last line is no longer visible in the view,
-            // push out a line from the end of buffer
-            // Make sure to run self.display_content = string_to_lines with appropriate args to update
             return Err("Error: Start of file reached");
         }
     }
+    // Scroll content down, but do not let it scroll out of bounds
     fn scroll_down(&mut self) -> Result<(), &str> {
         let max_scroll_amount = self.display_content.len()
             - (self.term_bottom_cursor_bound() - self.term_top_cursor_bound() + 1) as usize;
@@ -627,10 +671,6 @@ impl<'a> App<'a> {
             self.scroll_amount += 1;
             return Ok(());
         } else {
-            // TO DO: Ask buffer to read in another line from rope to the end of buffer
-            // Then, if self.first_line_num no longer matches the line num of the top visible line in the view,
-            // push out a line from the head of buffer and adjust scroll accordingly.
-            // Make sure to run self.display_content = string_to_lines with appropriate args to update
             return Err("Error: End of file reached");
         }
     }
