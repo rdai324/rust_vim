@@ -1,10 +1,9 @@
-
 use regex::Regex;
 use ropey::Rope;
-use std::fs::File;
-use std::io::BufReader;
-use std::io;
 use std::fs;
+use std::fs::File;
+use std::io;
+use std::io::BufReader;
 
 #[derive(Debug)]
 pub struct EditorModel {
@@ -27,6 +26,18 @@ impl EditorModel {
     pub fn delete_char(&mut self, char_idx: usize) {
         if char_idx < self.rope.len_chars() {
             self.rope.remove(char_idx..char_idx + 1);
+        }
+    }
+
+    pub fn delete_range(&mut self, start_idx: usize, end_idx: usize) {
+        if end_idx > start_idx && end_idx < self.rope.len_chars() {
+            self.rope.remove(start_idx..end_idx);
+        }
+    }
+
+    pub fn delete_to_end(&mut self, start_idx: usize) {
+        if start_idx < self.rope.len_chars() {
+            self.rope.remove(start_idx..self.rope.len_chars());
         }
     }
 

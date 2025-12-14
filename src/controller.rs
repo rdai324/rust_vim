@@ -284,6 +284,15 @@ impl<'a> App<'a> {
         return index;
     }
 
+    // Used to re-wrap the displayed text after it's been updated
+    fn wrap_text(&mut self) {
+        self.display_content = string_to_lines(
+            self.model.rope.to_string().as_str(),
+            self.term_size.1,
+            self.show_line_nums,
+        );
+    }
+
     /*
      * Defines the boundaries of the cursor in the terminal window
      */
@@ -338,11 +347,7 @@ impl<'a> App<'a> {
         }
 
         // Re-wrap display content
-        self.display_content = string_to_lines(
-            self.model.rope.to_string().as_str(),
-            term_width,
-            self.show_line_nums,
-        );
+        self.wrap_text();
 
         // Update cursor position if terminal size shrunk
         if self.cursor_pos.1 > self.term_right_cursor_bound() {
@@ -576,11 +581,7 @@ impl<'a> App<'a> {
                     ":set number" | ":set num" | ":set nu" | ":num" | ":nu" => {
                         self.show_line_nums = !self.show_line_nums;
                         // Re-wrap display content for view
-                        self.display_content = string_to_lines(
-                            self.model.rope.to_string().as_str(),
-                            self.term_size.1,
-                            self.show_line_nums,
-                        );
+                        self.wrap_text();
                         self.slip_cursor(); // mainly used when turning on show_line_nums to stay out of line num region
                         self.snap_cursor(); // mainly used when turning off show_line_nums to snap to end of short lines
 
@@ -595,6 +596,59 @@ impl<'a> App<'a> {
                             self.msg_display = vec![];
                         }
                         self.mode = Mode::Normal;
+                    }
+                    // Delete current file line at cursor
+                    ":dd" => {
+                        let deleting_line_num =
+                            self.display_content[self.get_cursor_display_row()].line_num;
+
+                        let mut start_idx = 0;
+                        let mut start_found = false;
+                        let mut end_found = false;
+                        let mut curr_display_row = 0;
+                        // Search for the start of the line being deleted, and the start of the line after it
+                        while curr_display_row < self.display_content.len() {
+                            let line = &self.display_content[curr_display_row];
+
+                            if start_found {
+                                if line.line_num != deleting_line_num {
+                                    let end_idx = line.infile_index;
+                                    self.model.delete_range(start_idx, end_idx);
+                                    end_found = true;
+                                    break;
+                                }
+                            } else {
+                                if line.line_num == deleting_line_num {
+                                    start_idx = line.infile_index;
+                                    start_found = true;
+                                }
+                            }
+
+                            curr_display_row += 1;
+                        }
+
+                        // If we reached the end of the file before finding a new line, then this is the last line.
+                        // Delete to the end, and attempt to move the cursor up
+                        if !end_found {
+                            self.model.delete_to_end(start_idx);
+                            self.cursor_up();
+                        }
+
+                        // Re-wrap displayed text
+                        self.wrap_text();
+
+                        // Return to normal mode and clear :dd command from message display
+                        self.mode = Mode::Normal;
+                        if self.num_matches != 0 {
+                            // Re-display search matches message if we are still highlighting
+                            let mut message = self.num_matches.to_string();
+                            message.push_str(" matches for ");
+                            message.push_str(&self.search_term);
+                            //self.msg_display = message.chars().collect();
+                        } else {
+                            // clear the command from the window
+                            //self.msg_display = vec![];
+                        }
                     }
                     // Invalid command
                     _ => {
@@ -663,21 +717,13 @@ impl<'a> App<'a> {
         let file_ind = self.get_cursor_file_index(); // char index of file where character should be deleted
         self.model.delete_char(file_ind);
         // Re-wrap file content for display
-        self.display_content = string_to_lines(
-            self.model.rope.to_string().as_str(),
-            self.term_size.1,
-            self.show_line_nums,
-        );
+        self.wrap_text();
     }
     fn insert_char(&mut self, c: char) {
         let file_ind = self.get_cursor_file_index(); // char index of file where character should be inserted
         self.model.insert_char(c, file_ind);
         // Re-wrap file content for display
-        self.display_content = string_to_lines(
-            self.model.rope.to_string().as_str(),
-            self.term_size.1,
-            self.show_line_nums,
-        );
+        self.wrap_text();
         self.cursor_right();
     }
 

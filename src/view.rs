@@ -149,8 +149,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     let ui_text: Line;
     // Highlight error messages in red
     if ui_message.starts_with("Error") {
-        ui_text =
-            Line::styled(ui_message, Style::default().bg(Color::Red)).centered();
+        ui_text = Line::styled(ui_message, Style::default().bg(Color::Red)).centered();
     } else {
         ui_text = Line::styled(ui_message, Style::default()).centered();
     }
@@ -204,9 +203,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
             .split(area);
 
         // Header Text of quit popup
-        let mut header_text = String::from("Quit without saving to ");
-        header_text.push_str(file_name);
-        header_text.push('?');
+        let header_text = String::from(format!("Quit without saving to {file_name}?"));
         frame.render_widget(
             Paragraph::new(header_text)
                 .centered()
