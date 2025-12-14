@@ -544,7 +544,10 @@ impl<'a> App<'a> {
                 self.mode = Mode::Normal;
                 self.snap_cursor();
             }
-            KeyCode::Backspace => self.backspace_char(),
+            KeyCode::Backspace => {
+                self.cursor_left();
+                self.delete_char();
+            }
             KeyCode::Delete => self.delete_char(),
             KeyCode::Enter => self.insert_char('\n'),
             KeyCode::Tab => self.insert_char('\t'),
@@ -554,21 +557,6 @@ impl<'a> App<'a> {
             KeyCode::Left => self.cursor_left(),
             KeyCode::Right => self.cursor_right(),
             _ => {}
-        }
-    }
-    fn backspace_char(&mut self) {
-        let mut file_ind = self.get_cursor_file_index();
-        if file_ind > 0 {
-            file_ind -= 1; // char index of file where character should be deleted
-            self.model.delete_char(file_ind);
-            self.display_content = string_to_lines(
-                self.model.rope.to_string().as_str(),
-                self.term_size.1,
-                self.first_line_num,
-                self.first_char_ind,
-                self.show_line_nums,
-            );
-            self.cursor_left();
         }
     }
     fn delete_char(&mut self) {

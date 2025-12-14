@@ -14,10 +14,11 @@ use std::cmp::max;
 use std::io::stdout;
 
 const LEFT_HELP_TEXT: &str = "Normal Mode:
-Move the cursor with arrow keys
+Move the cursor with arrow keys or hjkl
 [i] to start editing text in Insertion Mode
 [:] to start typing in Command Mode
 [/] to start a query in Search Input Mode
+[Esc] to turn off Search Highlights
 
 Command Mode:
 [Esc] to cancel and return to Normal Mode
@@ -31,17 +32,14 @@ Commands:
 const RIGHT_HELP_TEXT: &str = "Insertion Mode:
 Move the cursor with arrow keys
 Type to insert characters at the cursor location
-[Backspace] to delete characters at the cursor location
+[Enter] to insert a new line
+[Backspace] to delete characters left of the cursor location
+[Del] to delete characters right of the cursor location
 [Esc] to return to Normal Mode
 
 Search Input Mode:
 [Esc] to cancel and return to Normal Mode
-[Enter] to submit the search query and enter Search Mode
-
-Search Mode:
-[Esc] to cancel and return to Normal Mode
-[n] to jump to the next match
-[p] to jump to the previous match";
+[Enter] to submit the search query and highlight matches";
 
 pub const MAX_HELP_SCROLL: u16 = 14;
 
