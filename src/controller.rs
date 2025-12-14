@@ -1,8 +1,8 @@
 use crate::model::{self, EditorModel};
 use crate::view::MAX_HELP_SCROLL;
+use core::num;
 use count_digits::CountDigits;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
-use core::num;
 use std::cmp;
 use std::fs;
 use std::io;
@@ -260,7 +260,7 @@ impl<'a> App<'a> {
             index -= 1; // Insertion mode has a thinner cursor that can move into 0 indexing
         }
         if self.show_line_nums {
-            index -= (line.line_num.count_digits() as usize + 1); // subtract the line number characters
+            index -= line.line_num.count_digits() as usize + 1; // subtract the line number characters
         }
         return index;
     }
@@ -275,11 +275,14 @@ impl<'a> App<'a> {
             .iter()
             .filter(|col| col < &&self.cursor_pos.1)
             .count();
+        let mut index = &line.infile_index + (self.cursor_pos.1 as usize) - num_skipped_cols;
         if let Mode::Insert = self.mode {
-            return &line.infile_index + (self.cursor_pos.1 as usize) - num_skipped_cols - 1;
-        } else {
-            return &line.infile_index + (self.cursor_pos.1 as usize) - num_skipped_cols;
+            index -= 1;
         }
+        if self.show_line_nums {
+            index -= line.line_num.count_digits() as usize + 1; // subtract the line number characters
+        }
+        return index;
     }
 
     /*
@@ -559,7 +562,7 @@ impl<'a> App<'a> {
                 self.mode = Mode::Normal;
             }
             KeyCode::Enter => {
-                let search_query : String = self.msg_display[1..].iter().collect();
+                let search_query: String = self.msg_display[1..].iter().collect();
                 let num_matches = self.model.run_search(search_query.as_str());
                 if num_matches > 0 {
                     self.search_term = Some(search_query);
