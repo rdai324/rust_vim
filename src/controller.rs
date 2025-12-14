@@ -260,7 +260,7 @@ impl<'a> App<'a> {
             index -= 1; // Insertion mode has a thinner cursor that can move into 0 indexing
         }
         if self.show_line_nums {
-            index -= (line.line_num.count_digits() as usize + 1); // subtract the line number characters
+            index -= line.line_num.count_digits() as usize + 1; // subtract the line number characters
         }
         return index;
     }
@@ -275,11 +275,16 @@ impl<'a> App<'a> {
             .iter()
             .filter(|col| col < &&self.cursor_pos.1)
             .count();
+
+        // Sum the infile index of the displayed line the cursor is on, with the cursor position, and subtract non-char columns
+        let mut index = &line.infile_index + (self.cursor_pos.1 as usize) - num_skipped_cols;
         if let Mode::Insert = self.mode {
-            return &line.infile_index + (self.cursor_pos.1 as usize) - num_skipped_cols - 1;
-        } else {
-            return &line.infile_index + (self.cursor_pos.1 as usize) - num_skipped_cols;
+            index -= 1; // Insertion mode has a thinner cursor that can move into 0 indexing
         }
+        if self.show_line_nums {
+            index -= line.line_num.count_digits() as usize + 1; // subtract the line number characters
+        }
+        return index;
     }
 
     /*
