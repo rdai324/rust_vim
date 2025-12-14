@@ -1,5 +1,6 @@
 use crate::model::EditorModel;
 use crate::view::MAX_HELP_SCROLL;
+use core::num;
 use count_digits::CountDigits;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use std::cmp;

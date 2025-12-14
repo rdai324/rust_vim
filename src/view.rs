@@ -146,9 +146,9 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     // Highlight error messages in red
     if ui_message.starts_with("Error") {
         ui_text =
-            Line::styled(ui_message, Style::default().fg(Color::White).bg(Color::Red)).centered();
+            Line::styled(ui_message, Style::default().fg(Color::Black).bg(Color::Red)).centered();
     } else {
-        ui_text = Line::styled(ui_message, Style::default().fg(Color::White)).centered();
+        ui_text = Line::styled(ui_message, Style::default().fg(Color::Black)).centered();
     }
     let ui_content: Text = vec![mode_text, ui_text].into();
     let ui_block = Block::new().borders(Borders::LEFT);
