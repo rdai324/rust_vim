@@ -1,8 +1,8 @@
 use crate::model::{self, EditorModel};
 use crate::view::MAX_HELP_SCROLL;
+use core::num;
 use count_digits::CountDigits;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
-use core::num;
 use std::cmp;
 use std::fs;
 use std::io;
@@ -15,7 +15,6 @@ pub enum Mode {
     Normal,
     Command,
     SearchInput,
-    Search,
     Insert,
     Minimized, //Used to prevent cursor out of bounds crash when terminal is shrunk to <=4 lines tall
     Help,      // Used to display the help screen
@@ -150,7 +149,8 @@ pub struct App<'a> {
     mode: Mode,
     show_line_nums: bool,
     msg_display: Vec<char>, // Input taken from user for commands or searching
-    search_term: Option<String>, // What is being searched for in search mode. Only assigned on successful match for View highlighting
+    search_term: String, // What is being searched for in search mode. Only assigned on successful match for View highlighting
+    num_matches: usize,  // Number of search matches found
     cursor_pos: (u16, u16), // cursor position in terminal. (y, x), or (row, col), with 1,1 being the top-left corner (1 not 0 due to border)
     term_size: (u16, u16),  // Terminal size
     running: bool,
@@ -173,7 +173,8 @@ impl<'a> App<'a> {
             mode: Mode::Normal,
             show_line_nums: false,
             msg_display: vec![],
-            search_term: None,
+            search_term: String::new(),
+            num_matches: 0,
             cursor_pos: (1, 1),
             term_size: (term_height, term_width),
             running: true,
@@ -213,7 +214,7 @@ impl<'a> App<'a> {
     pub fn get_term_size(&self) -> (u16, u16) {
         return self.term_size;
     }
-    pub fn get_search_term(&self) -> &Option<String> {
+    pub fn get_search_term(&self) -> &str {
         return &self.search_term;
     }
     pub fn get_show_line_num(&self) -> bool {
@@ -228,7 +229,6 @@ impl<'a> App<'a> {
             Mode::Normal => return "Normal Mode [z]=>Help [i]=>Insert [:]=>Command [/]=>Search",
             Mode::Command => return "Command Mode [ENTER]=>Submit [ESC]=>Exit",
             Mode::SearchInput => return "Search Mode [ENTER]=>Submit [ESC]=>Exit",
-            Mode::Search => return "Search Mode [n]=>Next [p]=>Prev [ESC]=>Exit",
             Mode::Insert => return "Insertion Mode [ESC]=>Exit",
             Mode::Minimized => return "Please Enlarge Terminal Window",
             Mode::Help => return "Help Page [ESC]=>Exit [^][v] to Scroll Help Text",
@@ -334,7 +334,6 @@ impl<'a> App<'a> {
 
         // Update cursor position if terminal size shrunk
         if self.cursor_pos.1 > self.term_right_cursor_bound() {
-            // TO DO: Check if in insertion mode
             self.cursor_pos.1 = self.term_right_cursor_bound();
         }
         if self.cursor_pos.0 > self.term_bottom_cursor_bound() {
@@ -343,7 +342,6 @@ impl<'a> App<'a> {
 
         // Edge case if enlarging terminal window and unwrapping displayed text reduced number of rows occupied by text
         if self.cursor_pos.0 > self.display_content.len() as u16 {
-            // TO DO: Attempt to load into buffer before giving up and shifting cursor back up
             self.cursor_pos.0 = self.display_content.len() as u16;
         }
 
@@ -390,7 +388,6 @@ impl<'a> App<'a> {
             Mode::Insert => self.insert_handle_key_event(key_event),
             Mode::Normal => self.normal_handle_key_event(key_event),
             Mode::SearchInput => self.search_input_handle_key_event(key_event),
-            Mode::Search => self.search_handle_key_event(key_event),
             Mode::Minimized => {}
             Mode::Help => self.help_handle_key_event(key_event),
         }
@@ -410,8 +407,21 @@ impl<'a> App<'a> {
 
     fn normal_handle_key_event(&mut self, key_event: KeyEvent) {
         // Clear any error/status messages once the user makes an input
-        self.msg_display = vec![];
+        if self.num_matches == 0 {
+            self.msg_display = vec![];
+        } else {
+            // Re-display search matches message if we are still highlighting
+            let mut message = self.num_matches.to_string();
+            message.push_str(" matches for ");
+            message.push_str(&self.search_term);
+            self.msg_display = message.chars().collect();
+        }
         match key_event.code {
+            KeyCode::Esc => {
+                self.search_term = String::new();
+                self.num_matches = 0;
+                self.msg_display = vec![];
+            }
             KeyCode::Char('i') | KeyCode::Char('I') => self.mode = Mode::Insert,
             KeyCode::Char(':') => {
                 self.mode = Mode::Command;
@@ -419,6 +429,8 @@ impl<'a> App<'a> {
             }
             KeyCode::Char('/') => {
                 self.mode = Mode::SearchInput;
+                self.search_term = String::new();
+                self.num_matches = 0;
                 self.msg_display = vec!['/'];
             }
             KeyCode::Char('z') | KeyCode::Char('Z') => self.mode = Mode::Help,
@@ -433,7 +445,15 @@ impl<'a> App<'a> {
     fn command_handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Esc => {
-                self.msg_display = vec![];
+                if self.num_matches == 0 {
+                    self.msg_display = vec![];
+                } else {
+                    // Re-display search matches message if we are still highlighting
+                    let mut message = self.num_matches.to_string();
+                    message.push_str(" matches for ");
+                    message.push_str(&self.search_term);
+                    self.msg_display = message.chars().collect();
+                }
                 self.mode = Mode::Normal;
             }
             KeyCode::Enter => {
@@ -484,6 +504,13 @@ impl<'a> App<'a> {
             KeyCode::Backspace => {
                 self.msg_display.pop();
                 if self.msg_display.len() == 0 {
+                    if self.num_matches != 0 {
+                        // Re-display search matches message if we are still highlighting
+                        let mut message = self.num_matches.to_string();
+                        message.push_str(" matches for ");
+                        message.push_str(&self.search_term);
+                        self.msg_display = message.chars().collect();
+                    }
                     self.mode = Mode::Normal;
                 }
             }
@@ -494,10 +521,26 @@ impl<'a> App<'a> {
 
     fn insert_handle_key_event(&mut self, key_event: KeyEvent) {
         // Clear any error/status messages once the user makes an input
-        self.msg_display = vec![];
+        if self.num_matches == 0 {
+            self.msg_display = vec![];
+        } else {
+            // Re-display search matches message if we are still highlighting
+            let mut message = self.num_matches.to_string();
+            message.push_str(" matches for ");
+            message.push_str(&self.search_term);
+            self.msg_display = message.chars().collect();
+        }
         match key_event.code {
             KeyCode::Esc => {
-                self.msg_display = vec![];
+                if self.num_matches == 0 {
+                    self.msg_display = vec![];
+                } else {
+                    // Re-display search matches message if we are still highlighting
+                    let mut message = self.num_matches.to_string();
+                    message.push_str(" matches for ");
+                    message.push_str(&self.search_term);
+                    self.msg_display = message.chars().collect();
+                }
                 self.mode = Mode::Normal;
                 self.snap_cursor();
             }
@@ -555,44 +598,45 @@ impl<'a> App<'a> {
     fn search_input_handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Esc => {
-                self.msg_display = vec![];
+                if self.num_matches == 0 {
+                    self.msg_display = vec![];
+                } else {
+                    // Re-display search matches message if we are still highlighting
+                    let mut message = self.num_matches.to_string();
+                    message.push_str(" matches for ");
+                    message.push_str(&self.search_term);
+                    self.msg_display = message.chars().collect();
+                }
                 self.mode = Mode::Normal;
             }
             KeyCode::Enter => {
-                let search_query : String = self.msg_display[1..].iter().collect();
-                let num_matches = self.model.run_search(search_query.as_str());
-                if num_matches > 0 {
-                    self.search_term = Some(search_query);
-                    let mut message = num_matches.to_string();
-                    message.push_str(" matches");
+                let search_query: String = self.msg_display[1..].iter().collect();
+                self.num_matches = self.model.run_search(search_query.as_str());
+                if self.num_matches > 0 {
+                    self.search_term = search_query;
+                    let mut message = self.num_matches.to_string();
+                    message.push_str(" matches for ");
+                    message.push_str(&self.search_term);
                     self.msg_display = message.chars().collect();
-                    self.mode = Mode::Search;
                 } else {
                     self.msg_display = "Error: No matches found".chars().collect();
-                    self.mode = Mode::Normal;
                 }
+                self.mode = Mode::Normal;
             }
             KeyCode::Backspace => {
                 self.msg_display.pop();
                 if self.msg_display.len() == 0 {
+                    if self.num_matches != 0 {
+                        // Re-display search matches message if we are still highlighting
+                        let mut message = self.num_matches.to_string();
+                        message.push_str(" matches for ");
+                        message.push_str(&self.search_term);
+                        self.msg_display = message.chars().collect();
+                    }
                     self.mode = Mode::Normal;
                 }
             }
             KeyCode::Char(character) => self.msg_display.push(character),
-            _ => {}
-        }
-    }
-
-    fn search_handle_key_event(&mut self, key_event: KeyEvent) {
-        match key_event.code {
-            KeyCode::Esc => {
-                self.search_term = None;
-                self.msg_display = vec![];
-                self.mode = Mode::Normal;
-            }
-            KeyCode::Char('n') => { /*TO DO Scroll to line containing next match if it exists*/ }
-            KeyCode::Char('p') => { /*TO DO Scroll to line containing previous match if it exists*/
-            }
             _ => {}
         }
     }

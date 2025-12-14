@@ -95,15 +95,13 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
             ));
         }
 
-        if let Some(keyword) = search_term
-            && line[line_content_index..].contains(keyword)
-        {
+        if line[line_content_index..].contains(search_term) {
             // There was a positive search result, highlight possible matches
-            let mut substrings = line[line_content_index..].split(keyword);
+            let mut substrings = line[line_content_index..].split(search_term);
             display_line.push(Span::raw(substrings.next().unwrap())); // The first elem of this iterator shouldn't be empty
             for substring in substrings {
                 display_line.push(Span::styled(
-                    keyword,
+                    search_term,
                     Style::default().fg(Color::White).bg(Color::Cyan),
                 ));
                 display_line.push(Span::raw(substring));
