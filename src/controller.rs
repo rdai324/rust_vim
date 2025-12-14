@@ -337,10 +337,13 @@ impl<'a> App<'a> {
                     self.msg_display = vec![];
                 } else {
                     // Re-display search matches message if we are still highlighting
-                    let mut message = self.num_matches.to_string();
-                    message.push_str(" matches for ");
-                    message.push_str(&self.search_term);
-                    self.msg_display = message.chars().collect();
+                    self.msg_display = format!(
+                        "{} matches for {}",
+                        self.num_matches.to_string(),
+                        &self.search_term
+                    )
+                    .chars()
+                    .collect();
                 }
             }
         }
@@ -431,10 +434,13 @@ impl<'a> App<'a> {
                     self.mode = Mode::Normal;
                     if self.num_matches != 0 {
                         // Re-display search matches message if we are still highlighting
-                        let mut message = self.num_matches.to_string();
-                        message.push_str(" matches for ");
-                        message.push_str(&self.search_term);
-                        self.msg_display = message.chars().collect();
+                        self.msg_display = format!(
+                            "{} matches for {}",
+                            self.num_matches.to_string(),
+                            &self.search_term
+                        )
+                        .chars()
+                        .collect();
                     } else {
                         // Clear quit command
                         self.msg_display = vec![];
@@ -457,10 +463,13 @@ impl<'a> App<'a> {
                 self.mode = Mode::Normal;
                 if self.num_matches != 0 {
                     // Re-display search matches message if we are still highlighting
-                    let mut message = self.num_matches.to_string();
-                    message.push_str(" matches for ");
-                    message.push_str(&self.search_term);
-                    self.msg_display = message.chars().collect();
+                    self.msg_display = format!(
+                        "{} matches for {}",
+                        self.num_matches.to_string(),
+                        &self.search_term
+                    )
+                    .chars()
+                    .collect();
                 } else {
                     // Clear quit command
                     self.msg_display = vec![];
@@ -476,6 +485,17 @@ impl<'a> App<'a> {
             KeyCode::Esc => {
                 self.mode = Mode::Normal;
                 self.scroll_help_amount = 0;
+
+                // Re-display search matches message if we are still highlighting
+                if self.num_matches > 0 {
+                    self.msg_display = format!(
+                        "{} matches for {}",
+                        self.num_matches.to_string(),
+                        &self.search_term
+                    )
+                    .chars()
+                    .collect();
+                }
             }
             // Scroll help pop-up contents
             KeyCode::Up | KeyCode::Char('^') => self.scroll_help_up(),
@@ -490,10 +510,13 @@ impl<'a> App<'a> {
             self.msg_display = vec![];
         } else {
             // Re-display search matches message if we are still highlighting
-            let mut message = self.num_matches.to_string();
-            message.push_str(" matches for ");
-            message.push_str(&self.search_term);
-            self.msg_display = message.chars().collect();
+            self.msg_display = format!(
+                "{} matches for {}",
+                self.num_matches.to_string(),
+                &self.search_term
+            )
+            .chars()
+            .collect();
         }
         match key_event.code {
             // Turn off any search highlighting
@@ -517,7 +540,10 @@ impl<'a> App<'a> {
                 self.msg_display = vec!['/'];
             }
             // Open help popup
-            KeyCode::Char('z') | KeyCode::Char('Z') => self.mode = Mode::Help,
+            KeyCode::Char('z') | KeyCode::Char('Z') => {
+                self.mode = Mode::Help;
+                self.msg_display = vec![];
+            }
             // Move cursor
             KeyCode::Up | KeyCode::Char('k') => self.cursor_up(),
             KeyCode::Down | KeyCode::Char('j') => self.cursor_down(),
@@ -533,10 +559,13 @@ impl<'a> App<'a> {
             KeyCode::Esc => {
                 if self.num_matches != 0 {
                     // Re-display search matches message if we are still highlighting
-                    let mut message = self.num_matches.to_string();
-                    message.push_str(" matches for ");
-                    message.push_str(&self.search_term);
-                    self.msg_display = message.chars().collect();
+                    self.msg_display = format!(
+                        "{} matches for {}",
+                        self.num_matches.to_string(),
+                        &self.search_term
+                    )
+                    .chars()
+                    .collect();
                 } else {
                     // Clear any remaining user input
                     self.msg_display = vec![];
@@ -586,10 +615,13 @@ impl<'a> App<'a> {
 
                         if self.num_matches != 0 {
                             // Re-display search matches message if we are still highlighting
-                            let mut message = self.num_matches.to_string();
-                            message.push_str(" matches for ");
-                            message.push_str(&self.search_term);
-                            self.msg_display = message.chars().collect();
+                            self.msg_display = format!(
+                                "{} matches for {}",
+                                self.num_matches.to_string(),
+                                &self.search_term
+                            )
+                            .chars()
+                            .collect();
                         } else {
                             // clear the command from the window
                             self.msg_display = vec![];
@@ -638,16 +670,7 @@ impl<'a> App<'a> {
 
                         // Return to normal mode and clear :dd command from message display
                         self.mode = Mode::Normal;
-                        if self.num_matches != 0 {
-                            // Re-display search matches message if we are still highlighting
-                            let mut message = self.num_matches.to_string();
-                            message.push_str(" matches for ");
-                            message.push_str(&self.search_term);
-                            //self.msg_display = message.chars().collect();
-                        } else {
-                            // clear the command from the window
-                            //self.msg_display = vec![];
-                        }
+                        self.msg_display = vec![];
                     }
                     // Invalid command
                     _ => {
@@ -663,10 +686,13 @@ impl<'a> App<'a> {
                 if self.msg_display.len() == 0 {
                     if self.num_matches != 0 {
                         // Re-display search matches message if we are still highlighting
-                        let mut message = self.num_matches.to_string();
-                        message.push_str(" matches for ");
-                        message.push_str(&self.search_term);
-                        self.msg_display = message.chars().collect();
+                        self.msg_display = format!(
+                            "{} matches for {}",
+                            self.num_matches.to_string(),
+                            &self.search_term
+                        )
+                        .chars()
+                        .collect();
                     }
                     self.mode = Mode::Normal;
                 }
@@ -681,10 +707,13 @@ impl<'a> App<'a> {
         // Clear any error/status messages once the user makes an input
         if self.num_matches != 0 {
             // Re-display search matches message if we are still highlighting
-            let mut message = self.num_matches.to_string();
-            message.push_str(" matches for ");
-            message.push_str(&self.search_term);
-            self.msg_display = message.chars().collect();
+            self.msg_display = format!(
+                "{} matches for {}",
+                self.num_matches.to_string(),
+                &self.search_term
+            )
+            .chars()
+            .collect();
         } else {
             self.msg_display = vec![];
         }
@@ -696,8 +725,12 @@ impl<'a> App<'a> {
             }
             // Delete characters
             KeyCode::Backspace => {
-                self.cursor_left();
-                self.delete_char();
+                if self.get_cursor_file_index() > 0 {
+                    self.cursor_left();
+                    self.delete_char();
+                } else {
+                    self.msg_display = "Error: Start of file reached".chars().collect();
+                }
             }
             KeyCode::Delete => self.delete_char(),
             // Type characters
@@ -730,15 +763,7 @@ impl<'a> App<'a> {
         match key_event.code {
             // Cancel and exit to Normal Mode
             KeyCode::Esc => {
-                if self.num_matches != 0 {
-                    // Re-display search matches message if we are still highlighting
-                    let mut message = self.num_matches.to_string();
-                    message.push_str(" matches for ");
-                    message.push_str(&self.search_term);
-                    self.msg_display = message.chars().collect();
-                } else {
-                    self.msg_display = vec![];
-                }
+                self.msg_display = vec![];
                 self.mode = Mode::Normal;
             }
             // Submit search query and see if matches are found
@@ -748,10 +773,13 @@ impl<'a> App<'a> {
                 if self.num_matches > 0 {
                     // Matches found, update app state so view knows to highlight them
                     self.search_term = search_query;
-                    let mut message = self.num_matches.to_string();
-                    message.push_str(" matches for ");
-                    message.push_str(&self.search_term);
-                    self.msg_display = message.chars().collect();
+                    self.msg_display = format!(
+                        "{} matches for {}",
+                        self.num_matches.to_string(),
+                        &self.search_term
+                    )
+                    .chars()
+                    .collect();
                 } else {
                     self.msg_display = "Error: No matches found".chars().collect();
                 }
