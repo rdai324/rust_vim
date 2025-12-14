@@ -1,4 +1,7 @@
-use crate::{App, controller::Mode};
+use crate::{
+    App,
+    controller::{Mode, QuitSelection},
+};
 use count_digits::{self, CountDigits};
 use crossterm::{cursor::SetCursorStyle, execute};
 use ratatui::{
@@ -63,6 +66,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     // Other important items used for View UI
     let app_mode = app.get_app_mode();
     let help_scroll = app.get_scroll_help_amount();
+    let quit_selection = app.get_quit_selection();
 
     let layout = Layout::default()
         .direction(Direction::Vertical)
@@ -148,7 +152,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
         ui_text =
             Line::styled(ui_message, Style::default().fg(Color::Black).bg(Color::Red)).centered();
     } else {
-        ui_text = Line::styled(ui_message, Style::default().fg(Color::Black)).centered();
+        ui_text = Line::styled(ui_message, Style::default()).centered();
     }
     let ui_content: Text = vec![mode_text, ui_text].into();
     let ui_block = Block::new().borders(Borders::LEFT);
@@ -165,9 +169,11 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
         frame.render_widget(Clear, area);
         frame.render_widget(help_popup_block, area);
 
+        // Split help popup into left half and right half
         let help_popup_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .margin(1)
+            .spacing(1)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(area);
 
@@ -179,6 +185,96 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
             .scroll((help_scroll, 0));
         frame.render_widget(left_help_text, help_popup_chunks[0]);
         frame.render_widget(right_help_text, help_popup_chunks[1]);
+    }
+
+    // Render Quit popup if confirming user's intent to quit without saving
+    if let Mode::Quit = app_mode {
+        let quit_popup_block = Block::bordered()
+            .border_set(border::THICK)
+            .style(Style::default().bg(Color::DarkGray));
+        let area = frame.area();
+        let area = popup_area(area, 90, 60);
+        frame.render_widget(Clear, area);
+        frame.render_widget(quit_popup_block, area);
+
+        let quit_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([Constraint::Percentage(15), Constraint::Min(5)])
+            .split(area);
+
+        // Header Text of quit popup
+        let mut header_text = String::from("Quit without saving to ");
+        header_text.push_str(file_name);
+        header_text.push('?');
+        frame.render_widget(
+            Paragraph::new(header_text)
+                .centered()
+                .style(Style::default().add_modifier(Modifier::BOLD)),
+            quit_layout[0],
+        );
+
+        // Three selection segments corresponding to the three quit options
+        let selection_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .margin(1)
+            .constraints([
+                Constraint::Percentage(33),
+                Constraint::Percentage(34),
+                Constraint::Percentage(33),
+            ])
+            .spacing(1)
+            .split(quit_layout[1]);
+
+        // Boxes for each of the options in their unselected form
+        let mut cancel_box = Paragraph::new("Cancel")
+            .block(Block::bordered().border_set(border::ROUNDED))
+            .centered()
+            .style(Style::default().fg(Color::LightYellow).bg(Color::DarkGray));
+        let mut quit_box = Paragraph::new("Quit Without Saving")
+            .block(Block::bordered().border_set(border::ROUNDED))
+            .centered()
+            .style(Style::default().fg(Color::LightRed).bg(Color::DarkGray));
+        let mut save_and_quit_box = Paragraph::new("Save & Quit")
+            .block(Block::bordered().border_set(border::ROUNDED))
+            .centered()
+            .style(Style::default().fg(Color::LightGreen).bg(Color::DarkGray));
+
+        // Update styling for the selected box to make it more vibrant
+        match quit_selection {
+            QuitSelection::Cancel => {
+                cancel_box = cancel_box.block(Block::bordered().border_set(border::THICK));
+                cancel_box = cancel_box.style(
+                    Style::default()
+                        .fg(Color::White)
+                        .bg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                );
+            }
+            QuitSelection::NoSaveQuit => {
+                quit_box = quit_box.block(Block::bordered().border_set(border::THICK));
+                quit_box = quit_box.style(
+                    Style::default()
+                        .fg(Color::White)
+                        .bg(Color::Red)
+                        .add_modifier(Modifier::BOLD),
+                );
+            }
+            QuitSelection::SaveAndQuit => {
+                save_and_quit_box =
+                    save_and_quit_box.block(Block::bordered().border_set(border::THICK));
+                save_and_quit_box = save_and_quit_box.style(
+                    Style::default()
+                        .fg(Color::White)
+                        .bg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                );
+            }
+        }
+
+        frame.render_widget(cancel_box, selection_layout[2]);
+        frame.render_widget(quit_box, selection_layout[1]);
+        frame.render_widget(save_and_quit_box, selection_layout[0]);
     }
 
     // Render cursor

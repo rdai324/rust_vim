@@ -17,6 +17,14 @@ pub enum Mode {
     Insert,
     Minimized, //Used to prevent cursor out of bounds crash when terminal is shrunk to <=4 lines tall
     Help,      // Used to display the help screen
+    Quit,      // Used for :q quit popup
+}
+
+#[derive(Debug)]
+pub enum QuitSelection {
+    SaveAndQuit,
+    NoSaveQuit,
+    Cancel,
 }
 
 fn string_to_lines(string: &str, term_width: u16, show_lines: bool) -> Vec<DisplayLine> {
@@ -140,6 +148,7 @@ pub struct App<'a> {
     display_content: Vec<DisplayLine>, // Vector of DisplayLine structs representing content being displayed + useful info
     scroll_amount: u16,                // How far did we scroll down display_content?
     scroll_help_amount: u16,           // How far to scroll help popup
+    quit_selection: QuitSelection,
     mode: Mode,
     show_line_nums: bool,
     msg_display: Vec<char>, // What to show in the bottom message bar (user input, error messages, etc.)
@@ -162,6 +171,7 @@ impl<'a> App<'a> {
             display_content: string_to_lines(display_string, term_width, false),
             scroll_amount: 0,
             scroll_help_amount: 0,
+            quit_selection: QuitSelection::Cancel,
             mode: Mode::Normal,
             show_line_nums: false,
             msg_display: vec![],
@@ -197,6 +207,9 @@ impl<'a> App<'a> {
     pub fn get_scroll_help_amount(&self) -> u16 {
         return self.scroll_help_amount;
     }
+    pub fn get_quit_selection(&self) -> &QuitSelection {
+        return &self.quit_selection;
+    }
     pub fn get_search_term(&self) -> &str {
         return &self.search_term;
     }
@@ -215,6 +228,7 @@ impl<'a> App<'a> {
             Mode::Insert => return "Insertion Mode [ESC]=>Exit",
             Mode::Minimized => return "Please Enlarge Terminal Window",
             Mode::Help => return "Help Page [ESC]=>Exit [^][v] to Scroll Help Text",
+            Mode::Quit => return "[<][>] to select, [ENTER]=>Confirm, [ESC]=>Cancel",
         }
     }
 
@@ -389,6 +403,66 @@ impl<'a> App<'a> {
             Mode::SearchInput => self.search_input_handle_key_event(key_event),
             Mode::Minimized => {}
             Mode::Help => self.help_handle_key_event(key_event),
+            Mode::Quit => self.quit_handle_key_event(key_event),
+        }
+    }
+
+    fn quit_handle_key_event(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            // Change selected option
+            KeyCode::Left | KeyCode::Char('<') | KeyCode::Char(',') => match self.quit_selection {
+                QuitSelection::Cancel => self.quit_selection = QuitSelection::NoSaveQuit,
+                QuitSelection::NoSaveQuit => self.quit_selection = QuitSelection::SaveAndQuit,
+                QuitSelection::SaveAndQuit => {}
+            },
+            KeyCode::Right | KeyCode::Char('>') | KeyCode::Char('.') => match self.quit_selection {
+                QuitSelection::Cancel => {}
+                QuitSelection::NoSaveQuit => self.quit_selection = QuitSelection::Cancel,
+                QuitSelection::SaveAndQuit => self.quit_selection = QuitSelection::NoSaveQuit,
+            },
+            // Confirm selection
+            KeyCode::Enter => match self.quit_selection {
+                // Cancel and return to normal mode
+                QuitSelection::Cancel => {
+                    self.mode = Mode::Normal;
+                    if self.num_matches != 0 {
+                        // Re-display search matches message if we are still highlighting
+                        let mut message = self.num_matches.to_string();
+                        message.push_str(" matches for ");
+                        message.push_str(&self.search_term);
+                        self.msg_display = message.chars().collect();
+                    } else {
+                        // Clear quit command
+                        self.msg_display = vec![];
+                    }
+                }
+                QuitSelection::NoSaveQuit => self.exit(),
+                QuitSelection::SaveAndQuit => match self.model.save() {
+                    Ok(_) => {
+                        self.exit();
+                    }
+                    Err(e) => {
+                        self.msg_display = format!("Error: could not write file: {}", e)
+                            .chars()
+                            .collect();
+                    }
+                },
+            },
+            // Cancel and return to Normal Mode
+            KeyCode::Esc => {
+                self.mode = Mode::Normal;
+                if self.num_matches != 0 {
+                    // Re-display search matches message if we are still highlighting
+                    let mut message = self.num_matches.to_string();
+                    message.push_str(" matches for ");
+                    message.push_str(&self.search_term);
+                    self.msg_display = message.chars().collect();
+                } else {
+                    // Clear quit command
+                    self.msg_display = vec![];
+                }
+            }
+            _ => {}
         }
     }
 
@@ -470,18 +544,21 @@ impl<'a> App<'a> {
                 let command: String = self.msg_display.iter().collect();
                 match command.as_str() {
                     // Write to file
-                    ":w" | ":write" => match self.model.save() {
-                        Ok(_) => {
-                            self.msg_display = "Wrote file".chars().collect();
+                    ":w" | ":write" => {
+                        match self.model.save() {
+                            Ok(_) => {
+                                self.msg_display = "Wrote file".chars().collect();
+                            }
+                            Err(e) => {
+                                self.msg_display = format!("Error: could not write file: {}", e)
+                                    .chars()
+                                    .collect();
+                            }
                         }
-                        Err(e) => {
-                            self.msg_display = format!("Error: could not write file: {}", e)
-                                .chars()
-                                .collect();
-                        }
-                    },
-                    // Quit
-                    ":q" | ":quit" => self.exit(),
+                        self.mode = Mode::Normal;
+                    }
+                    // Attempt to Quit without saving
+                    ":q" | ":quit" => self.mode = Mode::Quit,
                     // Write and quit
                     ":wq" => match self.model.save() {
                         Ok(_) => {
@@ -491,6 +568,8 @@ impl<'a> App<'a> {
                             self.msg_display = format!("Error: could not write file: {}", e)
                                 .chars()
                                 .collect();
+
+                            self.mode = Mode::Normal;
                         }
                     },
                     // Toggle line numbers
@@ -515,14 +594,15 @@ impl<'a> App<'a> {
                             // clear the command from the window
                             self.msg_display = vec![];
                         }
+                        self.mode = Mode::Normal;
                     }
                     // Invalid command
                     _ => {
                         let error_msg = String::from("Error: Invalid Command");
+                        self.mode = Mode::Normal;
                         self.msg_display = error_msg.chars().collect();
                     }
                 }
-                self.mode = Mode::Normal;
             }
             // Delete right-most user input character
             KeyCode::Backspace => {
