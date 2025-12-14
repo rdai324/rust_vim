@@ -27,9 +27,6 @@ pub enum QuitSelection {
 }
 
 fn string_to_lines(string: &str, term_width: u16, show_lines: bool) -> Vec<DisplayLine> {
-    if string.len() == 0 {
-        return vec![DisplayLine::new(1, 0, 0)];
-    }
     let chars = string.chars();
     let max_line_len = term_width - 2; // to accomodate the two borders
 
@@ -41,6 +38,9 @@ fn string_to_lines(string: &str, term_width: u16, show_lines: bool) -> Vec<Displ
     if show_lines {
         line.line_content = String::from("1|");
         total_char_width = 2;
+    }
+    if string.len() == 0 {
+        return vec![line];
     }
     for character in chars {
         // if character is a newline, stop building line and append it to lines
@@ -114,9 +114,7 @@ fn string_to_lines(string: &str, term_width: u16, show_lines: bool) -> Vec<Displ
     }
 
     // Push the last line to lines
-    if num_chars > 0 {
-        lines.push(line);
-    }
+    lines.push(line);
     return lines;
 }
 
@@ -132,7 +130,7 @@ pub struct DisplayLine {
 impl DisplayLine {
     pub fn new(line_num: usize, infile_index: usize, inline_index: usize) -> Self {
         Self {
-            line_content: String::new(),
+            line_content: String::from(""),
             line_num,
             infile_index,
             inline_index,
@@ -610,8 +608,8 @@ impl<'a> App<'a> {
                         self.show_line_nums = !self.show_line_nums;
                         // Re-wrap display content for view
                         self.wrap_text();
-                        self.slip_cursor(); // mainly used when turning on show_line_nums to stay out of line num region
                         self.snap_cursor(); // mainly used when turning off show_line_nums to snap to end of short lines
+                        self.slip_cursor(); // mainly used when turning on show_line_nums to stay out of line num region
 
                         if self.num_matches != 0 {
                             // Re-display search matches message if we are still highlighting
@@ -671,8 +669,8 @@ impl<'a> App<'a> {
                         while self.get_cursor_display_row() >= self.display_content.len() {
                             self.cursor_pos.0 -= 1;
                         }
-                        self.slip_cursor();
                         self.snap_cursor();
+                        self.slip_cursor();
 
                         // Return to normal mode and clear :dd command from message display
                         self.mode = Mode::Normal;
@@ -728,6 +726,7 @@ impl<'a> App<'a> {
             KeyCode::Esc => {
                 self.mode = Mode::Normal;
                 self.snap_cursor();
+                self.slip_cursor();
             }
             // Delete characters
             KeyCode::Backspace => {
@@ -953,7 +952,9 @@ impl<'a> App<'a> {
         let mut bound = cmp::max(width(line), 1);
 
         // Allow the cursor to move to the end of the line if in insertion mode
-        if let Mode::Insert = self.mode {
+        if let Mode::Insert = self.mode
+            && line.len() > 0
+        {
             bound += 1;
         }
 
