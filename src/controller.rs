@@ -115,7 +115,7 @@ fn string_to_lines(string: &str, term_width: u16, show_lines: bool) -> Vec<Displ
     }
 
     // Push the last line to lines
-    if total_char_width > 0 {
+    if num_chars > 0 {
         lines.push(line);
     }
     return lines;
