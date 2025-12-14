@@ -952,7 +952,9 @@ impl<'a> App<'a> {
         let mut bound = cmp::max(width(line), 1);
 
         // Allow the cursor to move to the end of the line if in insertion mode
-        if let Mode::Insert = self.mode {
+        if let Mode::Insert = self.mode
+            && line.len() > 0
+        {
             bound += 1;
         }
 
