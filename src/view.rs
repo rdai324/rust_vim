@@ -13,6 +13,7 @@ use ratatui::{
     text::{Line, Span, Text},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
+use regex::Regex;
 use std::cmp::max;
 use std::io::stdout;
 
@@ -52,7 +53,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     let file_name = app.get_filename();
     let display_lines = app.get_content();
     let show_line_num = app.get_show_line_num();
-    let search_term = app.get_search_term();
+    let re = Regex::new(app.get_search_term()).unwrap();
 
     // For message bar of UI
     let mode_text = app.get_mode_text();
@@ -105,19 +106,22 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
         }
 
         // Highlight search matches if present
-        if line[line_content_index..].contains(search_term) {
-            let mut substrings = line[line_content_index..].split(search_term);
-            // Split before match should be displayed as normal white text
-            display_line.push(Span::raw(substrings.next().unwrap())); // The first elem of this iterator shouldn't be empty
-            for substring in substrings {
+        if re.is_match(&line[line_content_index..]) {
+            let matches = re.find_iter(&line[line_content_index..]);
+            let mut curr_index = line_content_index;
+            // Iterate over regex matches
+            for regex_match in matches {
+                // normal white text (not search match)
+                display_line.push(Span::raw(&line[curr_index..regex_match.start()]));
                 // Highlighted search match
                 display_line.push(Span::styled(
-                    search_term,
+                    &line[regex_match.start()..regex_match.end()],
                     Style::default().fg(Color::White).bg(Color::Cyan),
                 ));
-                // normal white text (not search match)
-                display_line.push(Span::raw(substring));
+                curr_index = regex_match.end();
             }
+            // Add last substring as normal text
+            display_line.push(Span::raw(&line[curr_index..]));
         } else {
             // No search matches, display as normal white text
             display_line.push(Span::styled(&line[line_content_index..], Style::default()));
