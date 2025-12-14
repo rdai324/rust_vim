@@ -659,14 +659,20 @@ impl<'a> App<'a> {
                         }
 
                         // If we reached the end of the file before finding a new line, then this is the last line.
-                        // Delete to the end, and attempt to move the cursor up
+                        // Delete to the end
                         if !end_found {
                             self.model.delete_to_end(start_idx);
-                            self.cursor_up();
                         }
 
                         // Re-wrap displayed text
                         self.wrap_text();
+
+                        // Move cursor upwards if :dd ended up leaving cursor out of bounds
+                        while self.get_cursor_display_row() >= self.display_content.len() {
+                            self.cursor_pos.0 -= 1;
+                        }
+                        self.slip_cursor();
+                        self.snap_cursor();
 
                         // Return to normal mode and clear :dd command from message display
                         self.mode = Mode::Normal;
