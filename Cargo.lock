@@ -1067,7 +1067,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust_vim"
+name = "rust-vim"
 version = "0.1.0"
 dependencies = [
  "count-digits",
