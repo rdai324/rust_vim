@@ -763,6 +763,11 @@ impl<'a> App<'a> {
         // Re-wrap file content for display
         self.wrap_text();
         self.cursor_right();
+
+        // If inserted at end of display line, need to shift cursor right one more time to be right of the new character on the new line
+        if self.cursor_pos.1 == 1 && c != '\n' {
+            self.cursor_right();
+        }
     }
 
     fn search_input_handle_key_event(&mut self, key_event: KeyEvent) {
