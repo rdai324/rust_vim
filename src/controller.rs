@@ -726,6 +726,7 @@ impl<'a> App<'a> {
             KeyCode::Esc => {
                 self.mode = Mode::Normal;
                 self.snap_cursor();
+                self.slip_cursor();
             }
             // Delete characters
             KeyCode::Backspace => {
