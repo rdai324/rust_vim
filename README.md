@@ -148,23 +148,24 @@ rust-vim also works with paths to files that are not in the current directory. F
 	rust-vim rust_is_cool/rustacean.txt
 
 
-## Table of Contributions
+## Contributions
+The team members developed the core features collaboratively. Ray primarily focused on a user interface that closely mimics Vim. James focused on the backend that efficiently stores and retrieves the text. The interaction between the front-end and backend was a joint effort between James and Ray.
 | Name | Task | Other Notes |
 |-|-|-|
 |Ray|Terminal UI Setup|<ul><li>Clear the terminal and display the application</li><li>Restore the terminal on app closure</li><li>Accept user inputs</li><li>Handle the user resizing terminal window without crashing</li></ul> |
 |Ray|Status/Message Bar|<ul><li>Display current mode</li><li>Display error messages</li><li>Display user input</li><li>Display cursor infile location</li></ul> |
-|James|Read from file system to buffer||
+|James|Read from file system to buffer|<ul><li>Load file into the backend model</li><li>Create an empty file if the file does not already exist</li></ul>|
 |Ray|Text Wrapping|<ul><li>Must adapt to terminal resizing</li></ul>|
 |Ray|Cursor Positioning, Tracking, and Movement|<ul><li>Cursor must be bound to file contents and terminal window</li><li>Cursor's infile location must be tracked for backend use</li><li>Snap cursor to end of line when needed</li><li>Slip cursor through wide characters</li><li>Must adapt to user shrinking terminal window by pushing cursor up/left as needed</li></ul>|
 |Ray|Scroll File Contents||
-|James|Insert content to buffer||
-|James|Delete content from buffer||
+|James|Insert content to buffer|<ul><li>Handle inputs from the UI and record them properly in the backend model</li></ul>|
+|James|Delete content from buffer|<ul><li> Handle delete requests from the UI</li><li>Translate display cursor location into character index in the backend model</li><li>Delete the text at the corresponding location</li></ul>|
 |Ray|Controller State Machine for Vim Modes|<ul><li>Some features were implemented as extra modes under the hood</li></ul>|
 |Ray|Highlight Matches to Search Queries||
-|James|Search for content in buffer||
+|James|Search for content in buffer| <ul><li>Traverse the backend data model to return matches.</li></ul>|
 |Ray|Implement Line Number Toggle Command|<ul><li>Shift file contents and cursor as needed to adapt to added UI elements</li></ul>|
 |Ray|Help Pop-up Window||
-|James|Write to file system||
+|James|Write to file system|<ul><li>Serialize the backend model into a file for persistent storage</li></ul>|
 
 ## Lessons Learned and Concluding Remarks
 Two key lessons were learned from this project.
