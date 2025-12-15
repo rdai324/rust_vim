@@ -1,4 +1,8 @@
 # rust-vim
+# Video Slide Presentation
+The video slide presentation can be viewed via the canva link below: 
+
+https://www.canva.com/design/DAG7jEwLHoQ/WzW-_BRhdsUn6g717dJnWw/watch?utm_content=DAG7jEwLHoQ&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h9878677e9d
 # Final Report
 ## Members
 | Name | Student Number | Email |
