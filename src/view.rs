@@ -13,6 +13,7 @@ use ratatui::{
     text::{Line, Span, Text},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
+use regex::Regex;
 use std::cmp::max;
 use std::io::stdout;
 
@@ -52,7 +53,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     let file_name = app.get_filename();
     let display_lines = app.get_content();
     let show_line_num = app.get_show_line_num();
-    let search_term = app.get_search_term();
+    let show_highlights = app.get_show_highlights();
 
     // For message bar of UI
     let mode_text = app.get_mode_text();
@@ -88,39 +89,43 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     let title = Line::from(file_name.bold());
     let content_block = Block::bordered().title(title).border_set(border::THICK);
     let mut display_content: Vec<Line> = Vec::new();
-    for line in display_lines
-        .iter()
-        .map(|display_line| &display_line.line_content)
-    {
+    for line in display_lines.iter() {
         let mut display_line = vec![];
 
         // Format line numbers with yellow color
         let mut line_content_index = 0;
         if show_line_num {
-            line_content_index = line.find('|').unwrap();
+            line_content_index = line.line_content.find('|').unwrap();
             display_line.push(Span::styled(
-                &line[..line_content_index],
+                &line.line_content[..line_content_index],
                 Style::default().fg(Color::Yellow),
             ));
         }
 
         // Highlight search matches if present
-        if line[line_content_index..].contains(search_term) {
-            let mut substrings = line[line_content_index..].split(search_term);
-            // Split before match should be displayed as normal white text
-            display_line.push(Span::raw(substrings.next().unwrap())); // The first elem of this iterator shouldn't be empty
-            for substring in substrings {
-                // Highlighted search match
+        if show_highlights {
+            let mut curr_index = line_content_index;
+            // Iterate over the line's highlighted ranges
+            for highlight_range in &line.highlight_ranges {
+                // normal white text (not search match)
+                display_line.push(Span::raw(
+                    &line.line_content[curr_index..highlight_range.start],
+                ));
+                // highlighted range
                 display_line.push(Span::styled(
-                    search_term,
+                    &line.line_content[highlight_range.start..highlight_range.end],
                     Style::default().fg(Color::White).bg(Color::Cyan),
                 ));
-                // normal white text (not search match)
-                display_line.push(Span::raw(substring));
+                curr_index = highlight_range.end;
             }
+            // Add last substring as normal text
+            display_line.push(Span::raw(&line.line_content[curr_index..]));
         } else {
             // No search matches, display as normal white text
-            display_line.push(Span::styled(&line[line_content_index..], Style::default()));
+            display_line.push(Span::styled(
+                &line.line_content[line_content_index..],
+                Style::default(),
+            ));
         }
         display_content.push(display_line.into());
     }

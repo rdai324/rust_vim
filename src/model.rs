@@ -1,3 +1,4 @@
+use core::ops::Range;
 use regex::Regex;
 use ropey::Rope;
 use std::fs;
@@ -43,20 +44,24 @@ impl EditorModel {
         }
     }
 
-    pub fn run_search(&mut self, search_query: &str) -> usize {
-        let mut num_matches = 0;
+    pub fn run_search(&mut self, search_query: &str) -> Vec<Range<usize>> {
+        let mut matches = vec![];
         if search_query.is_empty() {
-            return 0;
+            return matches;
         }
         let re = Regex::new(&search_query).unwrap();
         let lines = self.rope.len_lines();
         for y in 0..lines {
             let line = self.rope.line(y).to_string();
-            for _ in re.find_iter(&line) {
-                num_matches += 1;
+            let idx = self.rope.line_to_char(y);
+            for regex_match in re.find_iter(&line) {
+                matches.push(Range {
+                    start: regex_match.start() + idx,
+                    end: regex_match.end() + idx,
+                });
             }
         }
-        return num_matches;
+        return matches;
     }
 
     pub fn save(&self) -> io::Result<()> {
