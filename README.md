@@ -142,17 +142,17 @@ After building, feel free to relocate the rust-vim binary file to any location o
 
 Once installed, you can run rust-vim by simply running the following command in a terminal
 
-	<path_to_rust-vim>/rust-vim <file_name>
+	./<path_to_rust-vim>/rust-vim <file_name>
 
 Which will open the file with the name <file_name> if it exists, or create it if it doesn’t.
 
 If you added rust-vim’s location to your device’s PATH environment variable, you can instead simply use
 
-	rust-vim <file_name>
+	./rust-vim <file_name>
 
 rust-vim also works with paths to files that are not in the current directory. For example, to open a file named rustacean.txt located in the ./rust_is_cool directory, you can use the following command
 
-	rust-vim rust_is_cool/rustacean.txt
+	./rust-vim rust_is_cool/rustacean.txt
 
 
 ## Contributions
