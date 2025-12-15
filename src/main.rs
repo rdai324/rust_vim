@@ -25,7 +25,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
         terminal.draw(|frame| draw_ui(frame, app))?; // draw_ui will be a pub func from view to draw the ui
         app.handle_events()?; // controller will process inputs
     }
-    return Ok(());
+    Ok(())
 }
 
 fn main() -> io::Result<()> {
@@ -33,11 +33,10 @@ fn main() -> io::Result<()> {
     let opts = Opt::from_args();
     let file_path = opts.file_name;
     if !file_path.exists() {
-        if let Some(parent) = file_path.parent() {
-            if !parent.exists() {
+        if let Some(parent) = file_path.parent()
+            && !parent.exists() {
                 fs::create_dir_all(parent)?;
             }
-        }
         fs::File::create(&file_path)?; // create an empty file
     }
 

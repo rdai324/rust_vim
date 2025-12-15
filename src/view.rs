@@ -13,7 +13,6 @@ use ratatui::{
     text::{Line, Span, Text},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
-use regex::Regex;
 use std::cmp::max;
 use std::io::stdout;
 
@@ -152,13 +151,12 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
     )
     .centered();
     // Second line contains user input, or messages to user
-    let ui_text: Line;
     // Highlight error messages in red
-    if ui_message.starts_with("Error") {
-        ui_text = Line::styled(ui_message, Style::default().bg(Color::Red)).centered();
+    let ui_text: Line = if ui_message.starts_with("Error") {
+        Line::styled(ui_message, Style::default().bg(Color::Red)).centered()
     } else {
-        ui_text = Line::styled(ui_message, Style::default()).centered();
-    }
+        Line::styled(ui_message, Style::default()).centered()
+    };
     let ui_content: Text = vec![mode_text, ui_text].into();
     let ui_block = Block::new().borders(Borders::LEFT);
     frame.render_widget(Paragraph::new(ui_content).block(ui_block), bottom_layout[1]);
@@ -209,7 +207,7 @@ pub fn draw_ui(frame: &mut Frame, app: &mut App) {
             .split(area);
 
         // Header Text of quit popup
-        let header_text = String::from(format!("Quit without saving to {file_name}?"));
+        let header_text = format!("Quit without saving to {file_name}?");
         frame.render_widget(
             Paragraph::new(header_text)
                 .centered()

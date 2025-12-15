@@ -15,7 +15,7 @@ pub struct EditorModel {
 impl EditorModel {
     pub fn new(file_name: &str) -> Self {
         Self {
-            rope: Rope::from_reader(BufReader::new(File::open(&file_name).unwrap())).unwrap(),
+            rope: Rope::from_reader(BufReader::new(File::open(file_name).unwrap())).unwrap(),
             file_name: String::from(file_name),
         }
     }
@@ -29,7 +29,7 @@ impl EditorModel {
             self.rope.remove(char_idx..char_idx + 1);
             return true;
         }
-        return false;
+        false
     }
 
     pub fn delete_range(&mut self, start_idx: usize, end_idx: usize) {
@@ -49,7 +49,7 @@ impl EditorModel {
         if search_query.is_empty() {
             return matches;
         }
-        let re = Regex::new(&search_query).unwrap();
+        let re = Regex::new(search_query).unwrap();
         let lines = self.rope.len_lines();
         for y in 0..lines {
             let line = self.rope.line(y).to_string();
@@ -61,7 +61,7 @@ impl EditorModel {
                 });
             }
         }
-        return matches;
+        matches
     }
 
     pub fn save(&self) -> io::Result<()> {

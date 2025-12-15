@@ -31,7 +31,7 @@ fn string_to_lines(
     string: &str,
     term_width: u16,
     show_lines: bool,
-    highlight_ranges: &Vec<Range<usize>>,
+    highlight_ranges: &[Range<usize>],
 ) -> Vec<DisplayLine> {
     let chars = string.chars();
     let max_line_len = term_width - 2; // to accomodate the two borders
@@ -64,7 +64,7 @@ fn string_to_lines(
                     })
                 } else {
                     line.highlight_ranges.push(Range {
-                        start: start,
+                        start,
                         end: num_chars,
                     });
                 }
@@ -118,7 +118,7 @@ fn string_to_lines(
                     })
                 } else {
                     line.highlight_ranges.push(Range {
-                        start: start,
+                        start,
                         end: num_chars,
                     });
                 }
@@ -171,43 +171,42 @@ fn string_to_lines(
 
         // Check if the char added is the last char of a match
         let infile_char_idx = line.infile_index + num_chars - 1;
-        if let Some(start) = highlight_start_idx {
-            if highlight_range.unwrap().end == infile_char_idx {
-                if show_lines {
-                    line.highlight_ranges.push(Range {
-                        start: start + line.line_num.count_digits() + 1,
-                        end: num_chars + line.line_num.count_digits(),
-                    })
-                } else {
-                    line.highlight_ranges.push(Range {
-                        start: start,
-                        end: num_chars - 1,
-                    });
-                }
-                highlight_range = highlight_ranges.next();
-                highlight_start_idx = None;
+        if let Some(start) = highlight_start_idx
+            && highlight_range.unwrap().end == infile_char_idx
+        {
+            if show_lines {
+                line.highlight_ranges.push(Range {
+                    start: start + line.line_num.count_digits() + 1,
+                    end: num_chars + line.line_num.count_digits(),
+                })
+            } else {
+                line.highlight_ranges.push(Range {
+                    start,
+                    end: num_chars - 1,
+                });
             }
+            highlight_range = highlight_ranges.next();
+            highlight_start_idx = None;
         }
 
         // Check if the char added is the first char of a match
-        if let Some(range) = highlight_range {
-            if num_chars > 0 {
-                if range.start == infile_char_idx {
-                    highlight_start_idx = Some(num_chars - 1)
-                }
-            }
+        if let Some(range) = highlight_range
+            && num_chars > 0
+            && range.start == infile_char_idx
+        {
+            highlight_start_idx = Some(num_chars - 1)
         }
     }
 
     // Push the last line to lines
     if let Some(start) = highlight_start_idx {
         line.highlight_ranges.push(Range {
-            start: start,
+            start,
             end: line.line_content.len(),
         })
     }
     lines.push(line);
-    return lines;
+    lines
 }
 
 #[derive(Debug)]
@@ -258,8 +257,8 @@ impl<'a> App<'a> {
         term_width: u16,
     ) -> Self {
         Self {
-            model: model,
-            display_content: string_to_lines(display_string, term_width, false, &vec![]),
+            model,
+            display_content: string_to_lines(display_string, term_width, false, &[]),
             scroll_amount: 0,
             scroll_help_amount: 0,
             quit_selection: QuitSelection::Cancel,
@@ -278,36 +277,36 @@ impl<'a> App<'a> {
      * Get ___ methods below:
      */
     pub fn get_filename(&self) -> &str {
-        return &self.model.file_name.as_str();
+        self.model.file_name.as_str()
     }
     pub fn get_content(&self) -> &Vec<DisplayLine> {
-        return &self.display_content;
+        &self.display_content
     }
     pub fn get_app_mode(&self) -> &Mode {
-        return &self.mode;
+        &self.mode
     }
     pub fn get_msg_display(&self) -> String {
-        return self.msg_display.iter().collect();
+        self.msg_display.iter().collect()
     }
     pub fn get_cursor_pos(&self) -> (u16, u16) {
-        return self.cursor_pos;
+        self.cursor_pos
     }
     pub fn get_scroll_amount(&self) -> u16 {
-        return self.scroll_amount;
+        self.scroll_amount
     }
     pub fn get_scroll_help_amount(&self) -> u16 {
-        return self.scroll_help_amount;
+        self.scroll_help_amount
     }
     pub fn get_quit_selection(&self) -> &QuitSelection {
-        return &self.quit_selection;
+        &self.quit_selection
     }
     pub fn get_show_line_num(&self) -> bool {
-        return self.show_line_nums;
+        self.show_line_nums
     }
 
     // Are we highlighting search matches?
     pub fn get_show_highlights(&self) -> bool {
-        return self.search_term.len() > 0;
+        !self.search_term.is_empty()
     }
 
     /*
@@ -315,13 +314,13 @@ impl<'a> App<'a> {
      */
     pub fn get_mode_text(&self) -> &str {
         match &self.mode {
-            Mode::Normal => return "Normal Mode [z]=>Help [i]=>Insert [:]=>Command [/]=>Search",
-            Mode::Command => return "Command Mode [ENTER]=>Submit [ESC]=>Exit",
-            Mode::SearchInput => return "Search Mode [ENTER]=>Submit [ESC]=>Exit",
-            Mode::Insert => return "Insertion Mode [ESC]=>Exit",
-            Mode::Minimized => return "Please Enlarge Terminal Window",
-            Mode::Help => return "Help Page [ESC]=>Exit [^][v] to Scroll Help Text",
-            Mode::Quit => return "[<][>] to select, [ENTER]=>Confirm, [ESC]=>Cancel",
+            Mode::Normal => "Normal Mode [z]=>Help [i]=>Insert [:]=>Command [/]=>Search",
+            Mode::Command => "Command Mode [ENTER]=>Submit [ESC]=>Exit",
+            Mode::SearchInput => "Search Mode [ENTER]=>Submit [ESC]=>Exit",
+            Mode::Insert => "Insertion Mode [ESC]=>Exit",
+            Mode::Minimized => "Please Enlarge Terminal Window",
+            Mode::Help => "Help Page [ESC]=>Exit [^][v] to Scroll Help Text",
+            Mode::Quit => "[<][>] to select, [ENTER]=>Confirm, [ESC]=>Cancel",
         }
     }
 
@@ -330,7 +329,7 @@ impl<'a> App<'a> {
      */
     pub fn get_cursor_display_row(&self) -> usize {
         // display_content is 0-indexed, cursor_pos is 1-indexed
-        return (self.scroll_amount + self.cursor_pos.0) as usize - 1;
+        (self.scroll_amount + self.cursor_pos.0) as usize - 1
     }
     /*
      * Used to get which column of the file line the cursor is currently located at
@@ -345,14 +344,14 @@ impl<'a> App<'a> {
             .count();
 
         // Sum the inline index of the displayed line the cursor is on, with the cursor position, and subtract non-char columns
-        let mut index = &line.inline_index + (self.cursor_pos.1 as usize) - num_skipped_cols;
+        let mut index = line.inline_index + (self.cursor_pos.1 as usize) - num_skipped_cols;
         if let Mode::Insert = self.mode {
             index -= 1; // Insertion mode has a thinner cursor that can move into 0 indexing
         }
         if self.show_line_nums {
-            index -= line.line_num.count_digits() as usize + 1; // subtract the line number characters
+            index -= line.line_num.count_digits() + 1; // subtract the line number characters
         }
-        return index;
+        index
     }
 
     /*
@@ -367,14 +366,14 @@ impl<'a> App<'a> {
             .count();
 
         // Sum the infile index of the displayed line the cursor is on, with the cursor position, and subtract non-char columns
-        let mut index = &line.infile_index + (self.cursor_pos.1 as usize) - num_skipped_cols;
+        let mut index = line.infile_index + (self.cursor_pos.1 as usize) - num_skipped_cols;
         if let Mode::Insert = self.mode {
             index -= 1; // Insertion mode has a thinner cursor that can move into 0 indexing
         }
         if self.show_line_nums {
-            index -= line.line_num.count_digits() as usize + 1; // subtract the line number characters
+            index -= line.line_num.count_digits() + 1; // subtract the line number characters
         }
-        return index;
+        index
     }
 
     // Used to re-wrap the displayed text after it's been updated
@@ -395,11 +394,11 @@ impl<'a> App<'a> {
      * Defines the boundaries of the cursor in the terminal window
      */
     pub fn term_top_cursor_bound(&self) -> u16 {
-        return 1;
+        1
     }
     pub fn term_bottom_cursor_bound(&self) -> u16 {
         // -4 because borders + bottom status window
-        return self.term_size.0 - 4;
+        self.term_size.0 - 4
     }
     pub fn term_left_cursor_bound(&self) -> u16 {
         if self.show_line_nums {
@@ -408,11 +407,11 @@ impl<'a> App<'a> {
                 .count_digits() as u16
                 + 2;
         }
-        return 1;
+        1
     }
     pub fn term_right_cursor_bound(&self) -> u16 {
         // - 2 because borders
-        return self.term_size.1 - 2;
+        self.term_size.1 - 2
     }
 
     /*
@@ -428,22 +427,22 @@ impl<'a> App<'a> {
             return;
         }
         // Use to return to normal functionality after enlarging terminal back to usable size
-        if let Mode::Minimized = self.mode {
-            if term_height > 4 {
-                self.mode = Mode::Normal;
-                // Clear any previous unsubmitted user input
-                if !self.get_show_highlights() {
-                    self.msg_display = vec![];
-                } else {
-                    // Re-display search matches message if we are still highlighting
-                    self.msg_display = format!(
-                        "{} matches for {}",
-                        self.match_ranges.len().to_string(),
-                        &self.search_term
-                    )
-                    .chars()
-                    .collect();
-                }
+        if let Mode::Minimized = self.mode
+            && term_height > 4
+        {
+            self.mode = Mode::Normal;
+            // Clear any previous unsubmitted user input
+            if !self.get_show_highlights() {
+                self.msg_display = vec![];
+            } else {
+                // Re-display search matches message if we are still highlighting
+                self.msg_display = format!(
+                    "{} matches for {}",
+                    self.match_ranges.len(),
+                    &self.search_term
+                )
+                .chars()
+                .collect();
             }
         }
 
@@ -472,7 +471,7 @@ impl<'a> App<'a> {
      * Used to start/stop the app
      */
     pub fn running(&self) -> bool {
-        return self.running;
+        self.running
     }
     fn exit(&mut self) {
         self.running = false;
@@ -495,7 +494,7 @@ impl<'a> App<'a> {
             Event::Resize(col, row) => self.update_term_size(row, col),
             _ => {}
         };
-        return Ok(());
+        Ok(())
     }
 
     /*
@@ -535,7 +534,7 @@ impl<'a> App<'a> {
                         // Re-display search matches message if we are still highlighting
                         self.msg_display = format!(
                             "{} matches for {}",
-                            self.match_ranges.len().to_string(),
+                            self.match_ranges.len(),
                             &self.search_term
                         )
                         .chars()
@@ -564,7 +563,7 @@ impl<'a> App<'a> {
                     // Re-display search matches message if we are still highlighting
                     self.msg_display = format!(
                         "{} matches for {}",
-                        self.match_ranges.len().to_string(),
+                        self.match_ranges.len(),
                         &self.search_term
                     )
                     .chars()
@@ -589,7 +588,7 @@ impl<'a> App<'a> {
                 if self.get_show_highlights() {
                     self.msg_display = format!(
                         "{} matches for {}",
-                        self.match_ranges.len().to_string(),
+                        self.match_ranges.len(),
                         &self.search_term
                     )
                     .chars()
@@ -611,7 +610,7 @@ impl<'a> App<'a> {
             // Re-display search matches message if we are still highlighting
             self.msg_display = format!(
                 "{} matches for {}",
-                self.match_ranges.len().to_string(),
+                self.match_ranges.len(),
                 &self.search_term
             )
             .chars()
@@ -660,7 +659,7 @@ impl<'a> App<'a> {
                     // Re-display search matches message if we are still highlighting
                     self.msg_display = format!(
                         "{} matches for {}",
-                        self.match_ranges.len().to_string(),
+                        self.match_ranges.len(),
                         &self.search_term
                     )
                     .chars()
@@ -716,7 +715,7 @@ impl<'a> App<'a> {
                             // Re-display search matches message if we are still highlighting
                             self.msg_display = format!(
                                 "{} matches for {}",
-                                self.match_ranges.len().to_string(),
+                                self.match_ranges.len(),
                                 &self.search_term
                             )
                             .chars()
@@ -747,11 +746,9 @@ impl<'a> App<'a> {
                                     end_found = true;
                                     break;
                                 }
-                            } else {
-                                if line.line_num == deleting_line_num {
-                                    start_idx = line.infile_index;
-                                    start_found = true;
-                                }
+                            } else if line.line_num == deleting_line_num {
+                                start_idx = line.infile_index;
+                                start_found = true;
                             }
 
                             curr_display_row += 1;
@@ -788,12 +785,12 @@ impl<'a> App<'a> {
             // Delete right-most user input character
             KeyCode::Backspace => {
                 self.msg_display.pop();
-                if self.msg_display.len() == 0 {
+                if self.msg_display.is_empty() {
                     if self.get_show_highlights() {
                         // Re-display search matches message if we are still highlighting
                         self.msg_display = format!(
                             "{} matches for {}",
-                            self.match_ranges.len().to_string(),
+                            self.match_ranges.len(),
                             &self.search_term
                         )
                         .chars()
@@ -814,7 +811,7 @@ impl<'a> App<'a> {
             // Re-display search matches message if we are still highlighting
             self.msg_display = format!(
                 "{} matches for {}",
-                self.match_ranges.len().to_string(),
+                self.match_ranges.len(),
                 &self.search_term
             )
             .chars()
@@ -885,13 +882,13 @@ impl<'a> App<'a> {
             KeyCode::Enter => {
                 let search_query: String = self.msg_display[1..].iter().collect();
                 self.match_ranges = self.model.run_search(search_query.as_str());
-                if self.match_ranges.len() > 0 {
+                if !self.match_ranges.is_empty() {
                     // Matches found, update app state so view knows to highlight them
                     self.wrap_text();
                     self.search_term = search_query;
                     self.msg_display = format!(
                         "{} matches for {}",
-                        self.match_ranges.len().to_string(),
+                        self.match_ranges.len(),
                         &self.search_term
                     )
                     .chars()
@@ -905,7 +902,7 @@ impl<'a> App<'a> {
             KeyCode::Backspace => {
                 self.msg_display.pop();
                 // If entire user input deleted, return to normal mode
-                if self.msg_display.len() == 0 {
+                if self.msg_display.is_empty() {
                     self.mode = Mode::Normal;
                 }
             }
@@ -927,9 +924,9 @@ impl<'a> App<'a> {
     fn scroll_up(&mut self) -> Result<(), &str> {
         if self.scroll_amount > 0 {
             self.scroll_amount -= 1;
-            return Ok(());
+            Ok(())
         } else {
-            return Err("Error: Start of file reached");
+            Err("Error: Start of file reached")
         }
     }
     // Scroll content down, but do not let it scroll out of bounds
@@ -938,9 +935,9 @@ impl<'a> App<'a> {
             - (self.term_bottom_cursor_bound() - self.term_top_cursor_bound() + 1) as usize;
         if (self.scroll_amount as usize) < max_scroll_amount {
             self.scroll_amount += 1;
-            return Ok(());
+            Ok(())
         } else {
-            return Err("Error: End of file reached");
+            Err("Error: End of file reached")
         }
     }
 
@@ -1056,7 +1053,7 @@ impl<'a> App<'a> {
 
         // Allow the cursor to move to the end of the line if in insertion mode
         if let Mode::Insert = self.mode
-            && line.len() > 0
+            && !line.is_empty()
         {
             bound += 1;
         }
