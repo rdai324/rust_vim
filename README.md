@@ -83,7 +83,7 @@ Finally, a quick-help pop-up was also implemented to give users a reference manu
 This section acts as a brief user guide of how to use the different features rust-vim provides. For instructions on how to compile, and then run rust-vim to open or create a file, please refer to the Reproducibility Guide.
 ### Hotkey Summary
 The Help Pop-up below shows a brief overall summary of the important hotkeys in each mode.
-[TODO: INSERT IMAGE]
+![Help Pop-up](https://github.com/rdai324/rust_vim/blob/main/help.png)
 
 Detailed explanations of each mode are provided in the corresponding sections below
 ### Normal Mode
