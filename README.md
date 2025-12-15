@@ -1,4 +1,8 @@
 # rust-vim
+# Video Demo
+The video demo can be viewed via the canva link below: 
+
+https://www.canva.com/design/DAG7nESdqIo/vjKd4K8wUZdbsKegVfCb7Q/watch?utm_content=DAG7nESdqIo&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h4eb724a466
 # Video Slide Presentation
 The video slide presentation can be viewed via the canva link below: 
 
