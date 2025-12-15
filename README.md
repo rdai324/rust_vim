@@ -50,9 +50,11 @@ Since this is a vim-inspired text editor, vim’s most important modes are also 
     * Quit (:q)
     * Write-Quit (:wq)
     * Line Number Toggling (:num)
+    * Line Deletion (:dd)
 * Search Mode for searching strings
     * Unlike vim, this was separated from the Command Mode for better code structuring and ease of use
-    * If matches exist, they will then be highlighted, and the user can jump to the next or previous match using the [n] and [p] keys respectively.
+    * If matches exist, they will then be highlighted until the user hits [Esc] in Normal Mode or begins a new search
+    * Supports Regex searching
 
 Hotkeys and navigation between modes is discussed in the user guide below. Other vim features also implemented in this app include a status bar at the bottom of the terminal window, and text soft-wrapping.
 
@@ -68,7 +70,7 @@ Due to time constraints, the following vim modes, commands, and features will no
 * Binary, Org, and Replace modes
 * Text undo/redo functionality
 
-Finally, a quick-help pop-up was also implemented to give users a reference manual for how to use the commands and hotkeys provided. Users can view it from the Normal Mode by tapping [h], scroll through it with up/down arrow keys, and close it using [Esc].
+Finally, a quick-help pop-up was also implemented to give users a reference manual for how to use the commands and hotkeys provided. Users can view it from the Normal Mode by tapping [z], scroll through it with up/down arrow keys, and close it using [Esc].
 ## User Guide
 This section acts as a brief user guide of how to use the different features rust-vim provides. For instructions on how to compile, and then run rust-vim to open or create a file, please refer to the Reproducibility Guide.
 ### Hotkey Summary
@@ -84,7 +86,7 @@ The following hotkeys are used to navigate to other modes from Normal Mode:
 [:] to enter Command Mode and start writing commands
 [/] to enter Search Mode and start writing a search query
 
-Additionally, the user can also open up the quick-help pop-up using the [h] hotkey, to view a quick-reference user manual. The help pop-up’s contents can be scrolled using the up/down arrow keys, and users can return to Normal Mode using the [Esc] key.
+Additionally, the user can also open up the quick-help pop-up using the [z] hotkey, to view a quick-reference user manual. The help pop-up’s contents can be scrolled using the up/down arrow keys, and users can return to Normal Mode using the [Esc] key.
 ### Insert Mode
 In Insertion Mode, the user can still move the cursor with the arrow keys just like in Normal Mode. To edit the file, simply type on the keyboard to insert characters to the right of the cursor’s current location. The cursor will then automatically move rightwards with whatever was typed, just like in traditional text editors. Use the [Enter] key to insert a new line, and the [Backspace] key to remove the character to the left of the cursor’s current location.
 
@@ -97,23 +99,24 @@ Users can use the [Backspace] key to delete the right-most character of the comm
 Once the user has typed out a desired command to run, users can press the [Enter] key to submit and run the command, before returning to Normal Mode if the file was not closed. Implemented commands are shown below:
 * [:w] to write and save over the file without quitting rust-vim
 * [:q] to terminate rust-vim without writing to the file, and then restore the terminal window to its previous state before starting rust-vim
-    * If there are unsaved changes detected in the file, the operation fails, and users will be returned to the Normal Mode with an appropriate error message
+    * This command will first display a pop-up window asking the user to confirm their intention to quit without saving
+    * Options can be selected with left/right arrow keys
+    * Selected option can be confirmed using [Enter] key
+    * Users can also hit [Esc] to cancel the command, closing the pop-up and returning them to Normal Mode
 * [:wq] to write and save over the file, terminate rust-vim, and then restore the terminal window to its previous state before starting rust-vim
-* [:num] to toggle whether rust-vim should also display line numbers to the left of the file contents.
+* [:num] to toggle whether rust-vim should also display line numbers to the left of the file contents
+* [:dd] to delete the current file line at the cursor
 
 If the submitted command does not match any of the above, the user is returned to the Normal Mode with an error message shown in the status bar informing the user that their command was invalid. This error message goes away after any user input is received.
 
 ### Search Mode
-In Command Mode, the cursor is locked, and users can no longer move it with arrow keys. Instead, users can type in the desired string to be queried for in the file. rust-vim automatically records the user’s keystrokes, and displays them for reference in the status bar below the file contents.
+In Search Mode, the cursor is locked, and users can no longer move it with arrow keys. Instead, users can type in the desired string to be queried for in the file. rust-vim automatically records the user’s keystrokes, and displays them for reference in the status bar below the file contents. rust-vim supports Regex searching.
 
 Users can use the [Backspace] key to delete the right-most character of the command being typed, in case they make a mistake. Deleting all characters in this manner (including the [/] character used to enter Search Mode) will return users back to Normal Mode. Users can also use the [Esc] key to exit Search Mode prematurely without querying anything, returning them back to Normal Mode.
 
-Once a user has finished typing the string they wish to search for, they can submit the query using the [Enter] key. If matches are found, rust-vim will automatically highlight them and scroll to the next match. From here, the user can use the following hotkeys
-* [n] to jump to the next match if it exists
-* [p] to jump to the previous match if it exists
-* [Esc] to exit Search Mode, turning off match highlights and returning to Normal Mode
+Once a user has finished typing the string they wish to search for, they can submit the query using the [Enter] key. If matches are found, rust-vim will automatically highlight them and return the user to Normal Mode. Search highlights will persist until the user hits [Esc] in Normal Mode, or until the user begins a new search query. 
 
-If rust-vim does not find any matches for the submitted query in the file, users are automatically returned to Normal Mode with an error message indicating this result.
+If rust-vim does not find any matches for the submitted query in the file, users are returned to Normal Mode with an error message indicating this result.
 ## Reproducibility Guide
 To build rust-vim, first ensure that cargo has been installed on the system. You can install cargo by following these instructions here: https://doc.rust-lang.org/cargo/getting-started/installation.html
 
@@ -155,17 +158,17 @@ The team members developed the core features collaboratively. Ray primarily focu
 |Ray|Terminal UI Setup|<ul><li>Clear the terminal and display the application</li><li>Restore the terminal on app closure</li><li>Accept user inputs</li><li>Handle the user resizing terminal window without crashing</li></ul> |
 |Ray|Status/Message Bar|<ul><li>Display current mode</li><li>Display error messages</li><li>Display user input</li><li>Display cursor infile location</li></ul> |
 |James|Read from file system to buffer|<ul><li>Load file into the backend model</li><li>Create an empty file if the file does not already exist</li></ul>|
+|James|Write to file system|<ul><li>Serialize the backend model into a file for persistent storage</li></ul>|
 |Ray|Text Wrapping|<ul><li>Must adapt to terminal resizing</li></ul>|
 |Ray|Cursor Positioning, Tracking, and Movement|<ul><li>Cursor must be bound to file contents and terminal window</li><li>Cursor's infile location must be tracked for backend use</li><li>Snap cursor to end of line when needed</li><li>Slip cursor through wide characters</li><li>Must adapt to user shrinking terminal window by pushing cursor up/left as needed</li></ul>|
 |Ray|Scroll File Contents||
 |James|Insert content to buffer|<ul><li>Handle inputs from the UI and record them properly in the backend model</li></ul>|
 |James|Delete content from buffer|<ul><li> Handle delete requests from the UI</li><li>Translate display cursor location into character index in the backend model</li><li>Delete the text at the corresponding location</li></ul>|
 |Ray|Controller State Machine for Vim Modes|<ul><li>Some features were implemented as extra modes under the hood</li></ul>|
-|Ray|Highlight Matches to Search Queries||
 |James|Search for content in buffer| <ul><li>Traverse the backend data model to return matches.</li></ul>|
-|Ray|Implement Line Number Toggle Command|<ul><li>Shift file contents and cursor as needed to adapt to added UI elements</li></ul>|
-|Ray|Help Pop-up Window||
-|James|Write to file system|<ul><li>Serialize the backend model into a file for persistent storage</li></ul>|
+|Ray|Highlight Matches to Search Queries||
+|Ray|Implement Line Number Toggle & Delete Line Commands|<ul><li>Shift file contents and cursor as needed to adapt to added UI elements</li></ul>|
+|Ray|Help and Confirm Quit Pop-up Window||
 
 ## Lessons Learned and Concluding Remarks
 Two key lessons were learned from this project.
