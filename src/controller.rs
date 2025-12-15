@@ -200,6 +200,12 @@ fn string_to_lines(
     }
 
     // Push the last line to lines
+    if let Some(start) = highlight_start_idx {
+        line.highlight_ranges.push(Range {
+            start: start,
+            end: line.line_content.len(),
+        })
+    }
     lines.push(line);
     return lines;
 }
