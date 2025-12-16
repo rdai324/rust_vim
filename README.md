@@ -17,7 +17,7 @@ https://www.canva.com/design/DAG7jEwLHoQ/WzW-_BRhdsUn6g717dJnWw/watch?utm_conten
 ## Motivation
 In the software engineering community, Vim has stood the test of time and proven itself as a classic code editor. When mastered, the editor offers enormous potential to boost coding productivity. Although it is relatively easy to get started with Vim, there is always more to learn - new motions, commands, registers, and workflows at large that unleashes even higher level of control and efficiency.
 
-As software engineers, we aspire to continuously improve our skills. Therefore the motivations for this project are threefold. Firstly, we would like to improve our coding productivity by getting more prodicient with Vim. We believe that implementing a stripped-down version of Vim, and understanding the internal architecture is an execellent way to take our Vim proficiency to the next level.
+As software engineers, we aspire to continuously improve our skills. Therefore the motivations for this project are threefold. Firstly, we would like to improve our coding productivity by getting more proficient with Vim. We believe that implementing a stripped-down version of Vim, and understanding the internal architecture is an execellent way to take our Vim proficiency to the next level.
 
 Secondly, we aim to gain practical experience with Rust programming. Through implementing a decently-sized software system, we aim to gain a deeper appreciation and understanding of Rust. Factoring in the timeline constraint, we think a stripped-down implementation of rust offers the ideal balance between technical complexity and project scope.
 
