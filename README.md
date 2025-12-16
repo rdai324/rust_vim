@@ -1,10 +1,10 @@
 # rust-vim
 # Video Demo
-The video demo can be viewed via the canva link below: 
+The video demo can be viewed via the canva link below:
 
 https://www.canva.com/design/DAG7nESdqIo/vjKd4K8wUZdbsKegVfCb7Q/watch?utm_content=DAG7nESdqIo&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h4eb724a466
 # Video Slide Presentation
-The video slide presentation can be viewed via the canva link below: 
+The video slide presentation can be viewed via the canva link below:
 
 https://www.canva.com/design/DAG7jEwLHoQ/WzW-_BRhdsUn6g717dJnWw/watch?utm_content=DAG7jEwLHoQ&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h9878677e9d
 # Final Report
@@ -15,17 +15,14 @@ https://www.canva.com/design/DAG7jEwLHoQ/WzW-_BRhdsUn6g717dJnWw/watch?utm_conten
 | James He | 1004118171 | james.he@mail.utoronto.ca|
 
 ## Motivation
-In the software engineering community, Vim is a popular choice of code editor thanks to its efficiency. The editor would be even more appealing and powerful if users can benefit from large-language models at the same time. An existing solution is Neovim, however Neovim comes packaged with excessive additional packages and extensions, which the typical user may rarely use.
+In the software engineering community, Vim has stood the test of time and proven itself as a classic code editor. When mastered, the editor offers enormous potential to boost coding productivity. Although it is relatively easy to get started with Vim, there is always more to learn - new motions, commands, registers, and workflows at large that unleashes even higher level of control and efficiency.
 
-To our knowledge, there does not exist a lightweight VIM-styled CLI text editor with Language-Server-Protocol (LSP) and Copilot-style LLM integration for code autocompletion. Our project aims to address this gap. We aim to first develop a CLI text editor in Rust. Then, if time allows, we will implement LSP and LLM support and demonstrate popular features such as code autocompletion.
+As software engineers, we aspire to continuously improve our skills. Therefore the motivations for this project are threefold. Firstly, we would like to improve our coding productivity by getting more prodicient with Vim. We believe that implementing a stripped-down version of Vim, and understanding the internal architecture is an execellent way to take our Vim proficiency to the next level.
 
-We believe implementing Vim in Rust is an ideal course project as there is a substantial opportunity for learning, there are many existing implementations for reference or comparison, and we are interested in deepening our understanding of Vim and its intricacies.
+Secondly, we aim to gain practical experience with Rust programming. Through implementing a decently-sized software system, we aim to gain a deeper appreciation and understanding of Rust. Factoring in the timeline constraint, we think a stripped-down implementation of rust offers the ideal balance between technical complexity and project scope.
 
-The technical complexity of this project is substantial enough to provide valuable learning experiences. The core challenges of the project align with Rust’s primary strengths. For example, Vim uses buffers to store large text files, and these buffers must be managed carefully to ensure data validity, and to prevent issues such as data corruption, duplication and unwanted mutations when interacting with the filesystem and terminal inputs. For our implementation, the Ropey Rust crate (https://crates.io/crates/ropey) happens to provide an efficient way to manage these text buffers.
+Lastly, to our knowledge, there does not exist a lightweight Vim-style CLI text editor with Language-Server-Protocol (LSP) and Copilot-style LLM integration for code autocompletion. Our project aims to be a starting point for addressing this gap. We aim to first develop a CLI text editor in Rust. Then, if time allows, we will implement LSP and LLM support and demonstrate popular features such as code autocompletion.
 
-The presence of reference implementations helps narrow the scope of our work to a manageable amount within the limited timeframe. This course focuses on learning the Rust language and emphasises implementation rather than design.  Given Vim is a well-established software system, we can refer to its existing architecture and focus on the implementation details, which is the focus of the course.
-
-Lastly, by developing an implementation of Vim, we naturally become better Vim users ourselves. Since Vim is known to boost productivity for software engineers, learning its intricacies provides clear benefits. In fact, one of our teammates just learnt to use hjkl rather than the arrow keys to navigate in the Normal Mode during our first project meeting!
 ## Objectives
 The key objective of this project is to develop a CLI text editor. This means that the bare minimum features that must be implemented include a Terminal UI, the ability to manipulate (i.e. open, read, write, and close) text files, and the ability to read user input for editing text files. These are fundamental features that are required to establish bare minimum functionality of our text editor.
 
@@ -122,7 +119,7 @@ In Search Mode, the cursor is locked, and users can no longer move it with arrow
 
 Users can use the [Backspace] key to delete the right-most character of the command being typed, in case they make a mistake. Deleting all characters in this manner (including the [/] character used to enter Search Mode) will return users back to Normal Mode. Users can also use the [Esc] key to exit Search Mode prematurely without querying anything, returning them back to Normal Mode.
 
-Once a user has finished typing the string they wish to search for, they can submit the query using the [Enter] key. If matches are found, rust-vim will automatically highlight them and return the user to Normal Mode. Search highlights will persist until the user hits [Esc] in Normal Mode, or until the user begins a new search query. 
+Once a user has finished typing the string they wish to search for, they can submit the query using the [Enter] key. If matches are found, rust-vim will automatically highlight them and return the user to Normal Mode. Search highlights will persist until the user hits [Esc] in Normal Mode, or until the user begins a new search query.
 
 If rust-vim does not find any matches for the submitted query in the file, users are returned to Normal Mode with an error message indicating this result.
 ## Reproducibility Guide
@@ -160,7 +157,11 @@ rust-vim also works with paths to files that are not in the current directory. F
 
 
 ## Contributions
+The team members took equal responsibilities in preparing the presentation slides, making the presentation recordings, and drafting the final report.
+
 The team members developed the core features collaboratively. Ray primarily focused on a user interface that closely mimics Vim. James focused on the backend that efficiently stores and retrieves the text. The interaction between the front-end and backend was a joint effort between James and Ray.
+
+Please refer to the table below for a detailed breakdown of implementation contribution.
 | Name | Task | Other Notes |
 |-|-|-|
 |Ray|Terminal UI Setup|<ul><li>Clear the terminal and display the application</li><li>Restore the terminal on app closure</li><li>Accept user inputs</li><li>Handle the user resizing terminal window without crashing</li></ul> |
@@ -187,7 +188,7 @@ One key example of this is the display_content which was stored in the App struc
 
 Another key lesson learned from this project was the complexity that can go into developing effective text writers, and the importance of good base algorithms over implementation fixes. One example was figuring out how to manage the cursor’s location in the file. A good algorithm is capable of handling many edge cases without requiring too many fixes for unhandled edge cases. In comparison, our algorithm to calculate and track the cursor's position in the file resulted in many unexpected complications arising such as the presence of wide characters, which if improperly handled, could result in the cursor entering an illegal position in the middle of the character.
 
-Tracking the cursor was also difficult because of the text wrapping, which meant that one line in the file could actually be represented by multiple lines on the terminal window. This meant that tracking things such as the cursor’s infile line index, and the cursor’s infile column number, couldn’t be done by simply using the cursor’s coordinates in the terminal. Instead, relevant details for each displayed line had to be stored separately, and then looked up in order to calculate the cursor’s infile line index and infile column number. The requirement of handling terminal resizing and scrolling only made this task more complex, and added more edge cases to handle seperately. 
+Tracking the cursor was also difficult because of the text wrapping, which meant that one line in the file could actually be represented by multiple lines on the terminal window. This meant that tracking things such as the cursor’s infile line index, and the cursor’s infile column number, couldn’t be done by simply using the cursor’s coordinates in the terminal. Instead, relevant details for each displayed line had to be stored separately, and then looked up in order to calculate the cursor’s infile line index and infile column number. The requirement of handling terminal resizing and scrolling only made this task more complex, and added more edge cases to handle seperately.
 
 Due to these complexities and inefficiencies caused by poor project management, we were also unfortunately unable to complete the bonus objectives of implementing LSP and LLM support into rust-vim for the submission of this project. However, there were plans to do so using the llm-lsp rust crate (https://crates.io/crates/llm-lsp) or similar crates.
 
